@@ -1,0 +1,195 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 98%;
+    --foreground: 0 0% 9%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 9%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 9%;
+
+    --primary: 158 64% 42%;
+    --primary-foreground: 0 0% 98%;
+
+    --secondary: 0 0% 94%;
+    --secondary-foreground: 0 0% 12%;
+
+    --muted: 0 0% 94%;
+    --muted-foreground: 0 0% 45%;
+
+    --accent: 0 0% 92%;
+    --accent-foreground: 0 0% 12%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 0 0% 89%;
+    --input: 0 0% 89%;
+    --ring: 158 64% 42%;
+
+    --radius: 0.75rem;
+  }
+
+  .dark {
+    --background: 0 0% 4%;
+    --foreground: 0 0% 95%;
+
+    --card: 0 0% 8%;
+    --card-foreground: 0 0% 95%;
+
+    --popover: 0 0% 8%;
+    --popover-foreground: 0 0% 95%;
+
+    --primary: 158 64% 46%;
+    --primary-foreground: 0 0% 98%;
+
+    --secondary: 0 0% 13%;
+    --secondary-foreground: 0 0% 95%;
+
+    --muted: 0 0% 13%;
+    --muted-foreground: 0 0% 55%;
+
+    --accent: 0 0% 15%;
+    --accent-foreground: 0 0% 95%;
+
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 0 0% 16%;
+    --input: 0 0% 16%;
+    --ring: 158 64% 46%;
+  }
+
+  /* Paletas de Color de Acento seleccionables por el usuario */
+  :root.theme-emerald {
+    --primary: 158 64% 42%;
+    --ring: 158 64% 42%;
+  }
+  :root.dark.theme-emerald {
+    --primary: 158 64% 46%;
+    --ring: 158 64% 46%;
+  }
+
+  :root.theme-indigo {
+    --primary: 243 75% 59%;
+    --ring: 243 75% 59%;
+  }
+  :root.dark.theme-indigo {
+    --primary: 243 75% 65%;
+    --ring: 243 75% 65%;
+  }
+
+  :root.theme-violet {
+    --primary: 262 83% 58%;
+    --ring: 262 83% 58%;
+  }
+  :root.dark.theme-violet {
+    --primary: 262 83% 65%;
+    --ring: 262 83% 65%;
+  }
+
+  :root.theme-amber {
+    --primary: 38 92% 50%;
+    --ring: 38 92% 50%;
+  }
+  :root.dark.theme-amber {
+    --primary: 38 92% 52%;
+    --ring: 38 92% 52%;
+  }
+
+  :root.theme-cyan {
+    --primary: 189 94% 43%;
+    --ring: 189 94% 43%;
+  }
+  :root.dark.theme-cyan {
+    --primary: 189 94% 48%;
+    --ring: 189 94% 48%;
+  }
+
+  /* Rosa exacto #dd0081 (Magenta intenso) */
+  :root.theme-rose {
+    --primary: 325 100% 43.3%;
+    --ring: 325 100% 43.3%;
+  }
+  :root.dark.theme-rose {
+    --primary: 325 100% 48%;
+    --ring: 325 100% 48%;
+  }
+
+  /* Neutral / Monocromático Gris */
+  :root.theme-neutral {
+    --primary: 0 0% 28%;
+    --ring: 0 0% 28%;
+  }
+  :root.dark.theme-neutral {
+    --primary: 0 0% 88%;
+    --ring: 0 0% 88%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground antialiased selection:bg-primary/20 selection:text-primary;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  }
+}
+
+/* Custom scrollbar for mobile feel */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(150, 150, 150, 0.2);
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(150, 150, 150, 0.4);
+}
+
+/* Safe area helpers para Notch de iPhone y barra gestual de Android */
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom, 12px);
+}
+.pt-safe {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+
+/* Optimización de animaciones GPU para celulares y dispositivos de bajos recursos */
+.hardware-accelerated {
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  perspective: 1000px;
+}
+
+/* Efecto táctil rápido (active) sin repintados pesados */
+.press-effect {
+  transition: transform 0.1s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.1s ease;
+  will-change: transform;
+}
+.press-effect:active {
+  transform: scale(0.96);
+}
+
+/* Respeto estricto para ahorro de batería o accesibilidad */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
