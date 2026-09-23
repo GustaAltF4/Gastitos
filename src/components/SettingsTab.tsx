@@ -21,7 +21,11 @@ import {
   Trash2,
   Cat,
   PawPrint,
+  Smartphone,
+  Download,
+  Share,
 } from 'lucide-react'
+import { usePwaInstall } from '../hooks/usePwaInstall'
 
 interface SettingsTabProps {
   config: UserConfig
@@ -66,6 +70,7 @@ export function SettingsTab({
   onClearAll,
   onTestNotification,
 }: SettingsTabProps) {
+  const { isInstalled, canInstall, isIos, installApp } = usePwaInstall()
   const [newCatInput, setNewCatInput] = useState('')
   const categories = config.categories && config.categories.length > 0 ? config.categories : DEFAULT_CATEGORIES
 
@@ -356,7 +361,74 @@ export function SettingsTab({
         </CardContent>
       </Card>
 
-      {/* 5. Informes y Gestión de Datos */}
+      {/* 5. Aplicación Web Progresiva (PWA / Instalar en Celular) */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base font-bold flex items-center gap-2">
+            <Smartphone className="h-5 w-5 text-primary" />
+            Aplicación Web (PWA)
+          </CardTitle>
+          <CardDescription>
+            Instala Gastitos como app nativa en tu iPhone, Android o computadora sin depender de tiendas de apps.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {isInstalled ? (
+            <div className="flex items-center gap-3 p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/25 text-emerald-600 dark:text-emerald-400">
+              <Check className="h-5 w-5 shrink-0" />
+              <div className="text-xs">
+                <p className="font-bold">¡Aplicación instalada y activa!</p>
+                <p className="opacity-90">Estás usando Gastitos en modo independiente y con soporte fuera de línea (Offline).</p>
+              </div>
+            </div>
+          ) : isIos ? (
+            <div className="p-4 rounded-xl bg-muted/60 border border-border/80 space-y-3">
+              <div className="flex items-center gap-2 text-sm font-bold text-foreground">
+                <Share className="h-4 w-4 text-primary" />
+                <span>Cómo instalar en tu iPhone / iPad:</span>
+              </div>
+              <ol className="text-xs text-muted-foreground space-y-1.5 list-decimal list-inside">
+                <li>Abre esta página en el navegador <strong>Safari</strong>.</li>
+                <li>Toca el botón <strong>Compartir</strong> (el cuadrado con la flecha hacia arriba <span className="font-mono text-foreground font-bold">⎋</span>).</li>
+                <li>Baja en el menú y selecciona <strong>"Agregar a pantalla de inicio"</strong>.</li>
+              </ol>
+              <p className="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium pt-1">
+                🐾 Se creará el acceso directo con ícono de gato, pantalla completa y funcionará sin conexión.
+              </p>
+            </div>
+          ) : canInstall ? (
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-4 rounded-xl bg-primary/10 border border-primary/20">
+              <div>
+                <p className="text-sm font-bold text-foreground flex items-center gap-1.5">
+                  <Cat className="h-4 w-4 text-primary" /> Instalar en este dispositivo
+                </p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Disfruta de Gastitos a pantalla completa, con carga ultra rápida y modo offline.
+                </p>
+              </div>
+              <Button
+                onClick={installApp}
+                className="w-full sm:w-auto bg-primary hover:bg-primary/90 text-primary-foreground font-bold shadow-md shadow-primary/20"
+              >
+                <Download className="h-4 w-4 mr-2" />
+                Instalar App 🐾
+              </Button>
+            </div>
+          ) : (
+            <div className="p-3.5 rounded-xl bg-muted/40 border border-border/60 text-xs text-muted-foreground flex items-start gap-2.5">
+              <Cat className="h-4 w-4 text-primary shrink-0 mt-0.5" />
+              <div>
+                <p className="font-semibold text-foreground">Compatible con todos los navegadores modernos</p>
+                <p className="mt-0.5">
+                  Puedes agregar Gastitos a tu pantalla principal tocando el menú de opciones de tu navegador y seleccionando "Instalar" o "Agregar a pantalla principal".
+                </p>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* 6. Informes y Gestión de Datos */}
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-base font-bold flex items-center gap-2">
