@@ -1,6 +1,46 @@
 import { LocalNotifications } from '@capacitor/local-notifications'
-import { Reminder } from '../types/finance'
+import { Reminder, TattooAppointment, TattooReminderOption } from '../types/finance'
 import { formatCurrency } from '../lib/utils'
+
+// Calcular fecha y hora de la alerta según la opción elegida por la tatuadora
+export function calculateTattooAlertDate(
+  appointmentDate: string, // YYYY-MM-DD
+  appointmentTime: string, // HH:mm
+  option: TattooReminderOption
+): Date | null {
+  if (option === 'none') return null
+
+  const appDate = new Date(`${appointmentDate}T${appointmentTime}:00`)
+  if (isNaN(appDate.getTime())) return null
+
+  if (option === 'exact_time') {
+    return appDate
+  }
+
+  if (option === '2_hours_before') {
+    return new Date(appDate.getTime() - 2 * 60 * 60 * 1000)
+  }
+
+  if (option === 'same_day_morning') {
+    const d = new Date(`${appointmentDate}T09:00:00`)
+    return d
+  }
+
+  if (option === '1_day_before') {
+    const d = new Date(`${appointmentDate}T18:00:00`)
+    d.setDate(d.getDate() - 1)
+    return d
+  }
+
+  if (option === '2_days_before') {
+    const d = new Date(`${appointmentDate}T12:00:00`)
+    d.setDate(d.getDate() - 2)
+    return d
+  }
+
+  return null
+}
+
 
 // Sintetizador de sonido chime / campana agradable con Web Audio API (funciona offline, web y móvil)
 export function playChimeSound() {
@@ -186,5 +226,78 @@ export const notificationService = {
         })
       }
     }
+  },
+
+  // Programar múltiples notificaciones para turno de Tattoo
+  async scheduleTattooNotifications(appointment: TattooAppointment): Promise<number[]> {
+    const options = appointment.reminderOptions || (appointment.reminderOption ? [appointment.reminderOption] : [])
+    const activeOptions = options.filter((o) => o !== 'none')
+
+    if (activeOptions.length === 0) return []
+
+    const scheduledIds: number[] = []
+    const now = new Date()
+
+    await this.initChannels()
+    await this.requestPermission()
+
+    for (const opt of activeOptions) {
+      const alertDate = calculateTattooAlertDate(appointment.date, appointment.time, opt)
+      if (!alertDate || alertDate.getTime() <= now.getTime()) continue
+
+      const id = Math.floor(Math.random() * 900000) + 100000
+      let label = ''
+      if (opt === '2_days_before') label = 'En 2 días tienes turno'
+      else if (opt === '1_day_before') label = 'Mañana tienes turno'
+      else if (opt === 'same_day_morning') label = 'Hoy tienes turno'
+      else if (opt === '2_hours_before') label = 'En 2 horas comienza el turno'
+      else label = 'Turno ahora'
+
+      const body = `${label} con ${appointment.clientName} a las ${appointment.time} hs`
+
+      try {
+        await LocalNotifications.schedule({
+          notifications: [
+            {
+              title: `🖋️ Agenda Tattoo: ${appointment.clientName}`,
+              body: body,
+              id: id,
+              channelId: 'gastos_reminders_channel',
+              schedule: {
+                at: alertDate,
+                allowWhileIdle: true,
+              },
+              sound: 'beep.wav',
+              extra: {
+                tattooId: appointment.id,
+              },
+            },
+          ],
+        })
+        scheduledIds.push(id)
+      } catch (error) {
+        console.warn('Capacitor LocalNotifications fallback web para tattoo', error)
+        const delayMs = alertDate.getTime() - now.getTime()
+        if (delayMs > 0 && delayMs < 24 * 60 * 60 * 1000) {
+          setTimeout(() => {
+            playChimeSound()
+            if ('Notification' in window && Notification.permission === 'granted') {
+              new Notification(`🖋️ Agenda Tattoo: ${appointment.clientName}`, {
+                body: body,
+                icon: '/favicon.svg',
+              })
+            }
+          }, delayMs)
+        }
+      }
+    }
+
+    return scheduledIds
+  },
+
+  // Alias para retrocompatibilidad
+  async scheduleTattooNotification(appointment: TattooAppointment): Promise<number | undefined> {
+    const ids = await this.scheduleTattooNotifications(appointment)
+    return ids[0]
   },
 }

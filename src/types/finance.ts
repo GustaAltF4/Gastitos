@@ -41,3 +41,30 @@ export const DEFAULT_CATEGORIES: string[] = [
   'Compras',
   'Ingresos',
 ]
+
+export type TattooReminderOption =
+  | 'same_day_morning' // El mismo día a las 09:00 AM
+  | '1_day_before'     // 1 día antes a las 18:00 PM
+  | '2_days_before'    // 2 días antes a las 12:00 PM
+  | '2_hours_before'   // 2 horas antes de la sesión
+  | 'exact_time'       // A la hora exacta del turno
+  | 'none'
+
+export interface TattooAppointment {
+  id: string
+  clientName: string
+  date: string // YYYY-MM-DD
+  time: string // HH:mm
+  deposit?: number // Seña abonada
+  reminderOptions: TattooReminderOption[] // Múltiples alertas permitidas a la vez
+  notificationIds?: number[] // IDs de todas las notificaciones programadas
+  reminderOption?: TattooReminderOption // retrocompatibilidad
+  notificationId?: number // retrocompatibilidad
+  dayOfWeek?: number
+  contact?: string
+  design?: string
+  totalPrice?: number
+  notes?: string
+  createdAt: string
+}
+

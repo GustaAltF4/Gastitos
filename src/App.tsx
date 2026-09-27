@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Transaction, Reminder, TransactionScope, DEFAULT_CATEGORIES } from './types/finance'
+import { Transaction, Reminder, TattooAppointment, TransactionScope, DEFAULT_CATEGORIES } from './types/finance'
 import { storageService, UserConfig, RADIUS_VALUES } from './services/storage'
 import { notificationService } from './services/notifications'
 import { Header } from './components/Header'
@@ -10,6 +10,8 @@ import { TransactionList } from './components/TransactionList'
 import { TransactionModal } from './components/TransactionModal'
 import { ReminderList } from './components/ReminderList'
 import { ReminderModal } from './components/ReminderModal'
+import { TattooCalendar } from './components/TattooCalendar'
+import { TattooModal } from './components/TattooModal'
 import { SettingsTab } from './components/SettingsTab'
 import { Card } from './components/ui/card'
 import { formatCurrency } from './lib/utils'
@@ -23,6 +25,7 @@ import {
   ChevronLeft,
   ChevronRight,
   PawPrint,
+  Sparkles,
 } from 'lucide-react'
 
 export function App() {
@@ -43,9 +46,13 @@ export function App() {
   const [currentMonth, setCurrentMonth] = useState<Date>(new Date())
   const [scopeFilter, setScopeFilter] = useState<TransactionScope | 'all'>('all')
   const [activeTab, setActiveTab] = useState<'dashboard' | 'transactions' | 'reminders' | 'settings'>('dashboard')
+  const [alertsSubTab, setAlertsSubTab] = useState<'tattoo' | 'reminders'>('tattoo')
 
   const [isTxModalOpen, setIsTxModalOpen] = useState(false)
   const [isReminderModalOpen, setIsReminderModalOpen] = useState(false)
+  const [isTattooModalOpen, setIsTattooModalOpen] = useState(false)
+  const [selectedTattooDate, setSelectedTattooDate] = useState<string>(new Date().toISOString().slice(0, 10))
+  const [tattooAppointments, setTattooAppointments] = useState<TattooAppointment[]>([])
 
   // Aplicar clases de tema, modo oscuro y redondeo de bordes (--radius)
   const applyThemeClasses = (dark: boolean, theme: string, radius: string = 'md') => {
@@ -75,14 +82,16 @@ export function App() {
   // Carga inicial de datos
   useEffect(() => {
     async function loadData() {
-      const [txs, rems, cfg] = await Promise.all([
+      const [txs, rems, cfg, tattoo] = await Promise.all([
         storageService.getTransactions(),
         storageService.getReminders(),
         storageService.getConfig(),
+        storageService.getTattooAppointments(),
       ])
       setTransactions(txs)
       setReminders(rems)
       setConfig(cfg)
+      setTattooAppointments(tattoo)
       applyThemeClasses(cfg.darkMode, cfg.themeColor, cfg.borderRadius)
     }
     loadData()
@@ -100,7 +109,7 @@ export function App() {
   const handleClearAll = async () => {
     if (
       !confirm(
-        '¿Estás seguro de que deseas restablecer TODOS los movimientos y recordatorios a cero? Esta acción no se puede deshacer.'
+        '¿Estás seguro de que deseas restablecer TODOS los movimientos, recordatorios y turnos a cero? Esta acción no se puede deshacer.'
       )
     ) {
       return
@@ -108,7 +117,8 @@ export function App() {
     await storageService.clearAllData()
     setTransactions([])
     setReminders([])
-    alert('Todos tus movimientos y recordatorios han sido eliminados. La app quedó 100% en blanco.')
+    setTattooAppointments([])
+    alert('Todos tus movimientos, recordatorios y turnos de tattoo han sido eliminados. La app quedó 100% en blanco.')
   }
 
   // Guardar transacciones
@@ -185,6 +195,78 @@ export function App() {
     const updated = reminders.filter((r) => r.id !== id)
     setReminders(updated)
     await storageService.saveReminders(updated)
+  }
+
+  // Manejo de Turnos de Tattoo
+  const handleOpenAddTattoo = (date?: string) => {
+    setSelectedTattooDate(date || new Date().toISOString().slice(0, 10))
+    setIsTattooModalOpen(true)
+  }
+
+  const handleSaveTattooAppointment = async (
+    apptData: Omit<TattooAppointment, 'id' | 'createdAt'>,
+    addToIncome: boolean = false
+  ) => {
+    const newAppt: TattooAppointment = {
+      ...apptData,
+      id: crypto.randomUUID(),
+      createdAt: new Date().toISOString(),
+    }
+
+    // Si se activó la opción y tiene seña, sumar automáticamente a los Ingresos de Gastitos
+    if (addToIncome && apptData.deposit && apptData.deposit > 0) {
+      const newIncomeTx: Transaction = {
+        id: crypto.randomUUID(),
+        type: 'income',
+        amount: apptData.deposit,
+        category: 'Ingresos',
+        scope: 'business',
+        date: new Date().toISOString().slice(0, 10),
+        description: `Seña Tattoo - ${apptData.clientName}`,
+        createdAt: new Date().toISOString(),
+      }
+      const updatedTxs = [newIncomeTx, ...transactions]
+      setTransactions(updatedTxs)
+      await storageService.saveTransactions(updatedTxs)
+    }
+
+    // Programar múltiples notificaciones según las opciones elegidas
+    const notifIds = await notificationService.scheduleTattooNotifications(newAppt)
+    if (notifIds.length > 0) {
+      newAppt.notificationIds = notifIds
+      newAppt.notificationId = notifIds[0]
+    }
+
+    const updated = [...tattooAppointments, newAppt]
+    setTattooAppointments(updated)
+    await storageService.saveTattooAppointments(updated)
+  }
+
+  const handleDeleteTattooAppointment = async (id: string) => {
+    const target = tattooAppointments.find((a) => a.id === id)
+    if (!target) return
+    if (!confirm(`¿Eliminar el turno de tattoo con ${target.clientName}?`)) return
+
+    // Cancelar todas las alertas de este turno
+    const idsToCancel = target.notificationIds || (target.notificationId ? [target.notificationId] : [])
+    for (const nid of idsToCancel) {
+      await notificationService.cancelNotification(nid)
+    }
+
+    const updated = tattooAppointments.filter((a) => a.id !== id)
+    setTattooAppointments(updated)
+    await storageService.saveTattooAppointments(updated)
+  }
+
+  const handleResetTattooWeek = async () => {
+    for (const appt of tattooAppointments) {
+      const idsToCancel = appt.notificationIds || (appt.notificationId ? [appt.notificationId] : [])
+      for (const nid of idsToCancel) {
+        await notificationService.cancelNotification(nid)
+      }
+    }
+    setTattooAppointments([])
+    await storageService.resetTattooWeek()
   }
 
   // Probar notificación
@@ -322,17 +404,68 @@ export function App() {
               </div>
             )}
 
-            {/* Tab 3: Recordatorios */}
+            {/* Tab 3: Alertas & Agenda Tattoo */}
             {activeTab === 'reminders' && (
               <div className="space-y-4">
-                <ReminderList
-                  reminders={reminders}
-                  onComplete={handleCompleteReminder}
-                  onDelete={handleDeleteReminder}
-                  onTestNotification={handleTestNotification}
-                  onCreateNew={() => setIsReminderModalOpen(true)}
-                  currency={config.currency}
-                />
+                {/* Selector de Subsección: Agenda Tattoo Semanal vs Recordatorios */}
+                <div className="flex items-center p-1 rounded-2xl bg-muted/70 border border-border/80 max-w-md mx-auto">
+                  <button
+                    onClick={() => setAlertsSubTab('tattoo')}
+                    className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 active:scale-95 ${
+                      alertsSubTab === 'tattoo'
+                        ? 'bg-primary text-primary-foreground shadow-md shadow-primary/25'
+                        : 'text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    <Sparkles className="h-4 w-4" />
+                    <span>Agenda Tattoo Semanal</span>
+                    {tattooAppointments.length > 0 && (
+                      <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-black ${
+                        alertsSubTab === 'tattoo' ? 'bg-primary-foreground text-primary' : 'bg-primary/20 text-primary'
+                      }`}>
+                        {tattooAppointments.length}
+                      </span>
+                    )}
+                  </button>
+
+                  <button
+                    onClick={() => setAlertsSubTab('reminders')}
+                    className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 active:scale-95 ${
+                      alertsSubTab === 'reminders'
+                        ? 'bg-primary text-primary-foreground shadow-md shadow-primary/25'
+                        : 'text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    <Bell className="h-4 w-4" />
+                    <span>Pagos y Alertas</span>
+                    {pendingRemindersCount > 0 && (
+                      <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-black ${
+                        alertsSubTab === 'reminders' ? 'bg-primary-foreground text-primary' : 'bg-amber-500 text-white'
+                      }`}>
+                        {pendingRemindersCount}
+                      </span>
+                    )}
+                  </button>
+                </div>
+
+                {alertsSubTab === 'tattoo' ? (
+                  <TattooCalendar
+                    appointments={tattooAppointments}
+                    onAddAppointment={handleOpenAddTattoo}
+                    onDeleteAppointment={handleDeleteTattooAppointment}
+                    onResetWeek={handleResetTattooWeek}
+                    currency={config.currency}
+                  />
+                ) : (
+                  <ReminderList
+                    reminders={reminders}
+                    onComplete={handleCompleteReminder}
+                    onDelete={handleDeleteReminder}
+                    onTestNotification={handleTestNotification}
+                    onCreateNew={() => setIsReminderModalOpen(true)}
+                    currency={config.currency}
+                  />
+                )}
               </div>
             )}
 
@@ -385,13 +518,23 @@ export function App() {
                 type="button"
                 onClick={() => {
                   if (activeTab === 'reminders') {
-                    setIsReminderModalOpen(true)
+                    if (alertsSubTab === 'tattoo') {
+                      handleOpenAddTattoo()
+                    } else {
+                      setIsReminderModalOpen(true)
+                    }
                   } else {
                     setIsTxModalOpen(true)
                   }
                 }}
                 className="group relative h-12 w-12 -mt-5 rounded-2xl bg-gradient-to-tr from-primary via-primary/95 to-primary/80 hover:opacity-95 text-primary-foreground shadow-lg shadow-primary/30 flex items-center justify-center ring-4 ring-background transition-transform active:scale-85 hover:scale-105 duration-150 ease-out select-none"
-                title={activeTab === 'reminders' ? 'Nuevo recordatorio 🐾' : 'Registrar nuevo movimiento 🐾'}
+                title={
+                  activeTab === 'reminders'
+                    ? alertsSubTab === 'tattoo'
+                      ? 'Agendar turno tattoo 🖋️🐾'
+                      : 'Nuevo recordatorio 🐾'
+                    : 'Registrar nuevo movimiento 🐾'
+                }
               >
                 <Plus className="h-6 w-6 stroke-[2.5]" />
                 <PawPrint className="h-3 w-3 absolute bottom-1 right-1 text-primary-foreground/75 opacity-70 group-hover:opacity-100 transition-opacity" />
@@ -444,6 +587,13 @@ export function App() {
         open={isReminderModalOpen}
         onOpenChange={setIsReminderModalOpen}
         onSave={handleAddReminder}
+      />
+
+      <TattooModal
+        open={isTattooModalOpen}
+        onOpenChange={setIsTattooModalOpen}
+        onSave={handleSaveTattooAppointment}
+        initialDate={selectedTattooDate}
       />
     </div>
   )

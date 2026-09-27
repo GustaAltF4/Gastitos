@@ -1,9 +1,21 @@
 import { Preferences } from '@capacitor/preferences'
-import { Transaction, Reminder, DEFAULT_CATEGORIES } from '../types/finance'
+import { Transaction, Reminder, TattooAppointment, DEFAULT_CATEGORIES } from '../types/finance'
 
 const TRANSACTIONS_KEY = 'app_gastos_transactions'
 const REMINDERS_KEY = 'app_gastos_reminders'
 const USER_CONFIG_KEY = 'app_gastos_config'
+const TATTOO_APPOINTMENTS_KEY = 'app_gastos_tattoo_appointments'
+const TATTOO_WEEK_KEY = 'app_gastos_tattoo_week'
+
+// Obtener la fecha del Lunes de la semana actual (YYYY-MM-DD) para control de reinicio semanal
+export function getMondayOfWeek(d: Date = new Date()): string {
+  const date = new Date(d)
+  const day = date.getDay()
+  const diff = date.getDate() - (day === 0 ? 6 : day - 1)
+  const monday = new Date(date.setDate(diff))
+  monday.setHours(0, 0, 0, 0)
+  return monday.toISOString().slice(0, 10)
+}
 
 export type ThemeColor = 'emerald' | 'indigo' | 'violet' | 'amber' | 'cyan' | 'rose' | 'neutral'
 
@@ -138,5 +150,45 @@ export const storageService = {
   async clearAllData(): Promise<void> {
     await Preferences.remove({ key: TRANSACTIONS_KEY })
     await Preferences.remove({ key: REMINDERS_KEY })
+    await Preferences.remove({ key: TATTOO_APPOINTMENTS_KEY })
+    await Preferences.remove({ key: TATTOO_WEEK_KEY })
+  },
+
+  // Obtener turnos de tattoo con limpieza automática de días pasados (mantiene desde 1 día antes en adelante)
+  async getTattooAppointments(): Promise<TattooAppointment[]> {
+    try {
+      const yesterday = new Date()
+      yesterday.setDate(yesterday.getDate() - 1)
+      const yesterdayStr = yesterday.toISOString().slice(0, 10)
+
+      const { value } = await Preferences.get({ key: TATTOO_APPOINTMENTS_KEY })
+      if (!value) return []
+
+      const parsed: TattooAppointment[] = JSON.parse(value)
+      // Mantiene turnos desde ayer en adelante; descarta automáticamente lo anterior a ayer
+      const active = parsed.filter((a) => a.date >= yesterdayStr)
+
+      if (active.length !== parsed.length) {
+        await Preferences.set({
+          key: TATTOO_APPOINTMENTS_KEY,
+          value: JSON.stringify(active),
+        })
+      }
+      return active
+    } catch {
+      return []
+    }
+  },
+
+  async saveTattooAppointments(appointments: TattooAppointment[]): Promise<void> {
+    await Preferences.set({
+      key: TATTOO_APPOINTMENTS_KEY,
+      value: JSON.stringify(appointments),
+    })
+  },
+
+  async resetTattooWeek(): Promise<void> {
+    await Preferences.set({ key: TATTOO_APPOINTMENTS_KEY, value: JSON.stringify([]) })
   },
 }
+
