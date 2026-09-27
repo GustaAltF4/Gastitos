@@ -140,7 +140,7 @@ export function TattooModal({
         </DialogDescription>
       </DialogHeader>
 
-      <form onSubmit={handleSubmit} className="space-y-4 max-h-[75vh] overflow-y-auto pr-1">
+      <form onSubmit={handleSubmit} className="space-y-4 w-full min-w-0">
         {/* 1. Nombre del Cliente */}
         <div>
           <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block mb-1.5">
@@ -151,21 +151,21 @@ export function TattooModal({
             placeholder="Ej: Sofía Ramírez"
             value={clientName}
             onChange={(e) => setClientName(e.target.value)}
-            className="text-base font-semibold"
+            className="text-base font-semibold w-full"
             autoFocus
           />
         </div>
 
         {/* 2. Selector de Días: 1 día antes, Hoy y los 6 próximos */}
         <div>
-          <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center justify-between mb-1.5">
-            <span className="flex items-center gap-1.5">
-              <Calendar className="h-3.5 w-3.5 text-primary" />
-              Fecha del Turno *
+          <div className="flex items-center justify-between gap-2 mb-1.5">
+            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+              <Calendar className="h-3.5 w-3.5 text-primary shrink-0" />
+              <span>Fecha del Turno *</span>
             </span>
-            <span className="text-[10px] text-muted-foreground font-normal">Ayer, Hoy y próx. 6 días</span>
-          </label>
-          <div className="grid grid-cols-4 sm:grid-cols-8 gap-1.5">
+            <span className="text-[10px] text-muted-foreground font-normal">Ayer, Hoy + 6 días</span>
+          </div>
+          <div className="grid grid-cols-4 sm:grid-cols-8 gap-1.5 w-full">
             {rollingDays.map((d) => {
               const isSelected = selectedDate === d.date
               return (
@@ -173,7 +173,7 @@ export function TattooModal({
                   key={d.date}
                   type="button"
                   onClick={() => setSelectedDate(d.date)}
-                  className={`flex flex-col items-center justify-center p-2 rounded-xl text-xs font-semibold border transition-all active:scale-95 relative ${
+                  className={`min-w-0 flex flex-col items-center justify-center py-2 px-1 rounded-xl text-xs font-semibold border transition-all active:scale-95 relative ${
                     isSelected
                       ? 'border-primary bg-primary text-primary-foreground shadow-md shadow-primary/30 ring-2 ring-primary/20'
                       : d.isToday
@@ -183,7 +183,7 @@ export function TattooModal({
                       : 'border-border bg-card text-muted-foreground hover:bg-muted'
                   }`}
                 >
-                  <span className="text-[10px] uppercase font-bold opacity-85 leading-tight">{d.label}</span>
+                  <span className="text-[10px] uppercase font-bold opacity-85 leading-tight truncate">{d.label}</span>
                   <span className="text-sm font-black mt-0.5 leading-none">{d.dayNum}</span>
                   {d.isToday && !isSelected && (
                     <span className="h-1 w-1 rounded-full bg-primary mt-1" />
@@ -197,7 +197,7 @@ export function TattooModal({
         {/* 3. Hora del Turno */}
         <div>
           <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1 mb-1.5">
-            <Clock className="h-3.5 w-3.5 text-primary" />
+            <Clock className="h-3.5 w-3.5 text-primary shrink-0" />
             Hora del Turno *
           </label>
           <Input
@@ -205,14 +205,14 @@ export function TattooModal({
             required
             value={time}
             onChange={(e) => setTime(e.target.value)}
-            className="h-11 font-black text-center text-base"
+            className="h-11 font-black text-center text-base w-full"
           />
         </div>
 
         {/* 4. Seña Abonada + Checkbox Opcional de Ingreso */}
         <div className="p-3 rounded-2xl bg-muted/40 border border-border/80 space-y-2.5">
           <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1">
-            <DollarSign className="h-3.5 w-3.5 text-primary" />
+            <DollarSign className="h-3.5 w-3.5 text-primary shrink-0" />
             Seña Abonada (Opcional)
           </label>
           <div className="relative">
@@ -225,21 +225,20 @@ export function TattooModal({
               placeholder="0.00"
               value={deposit}
               onChange={(e) => setDeposit(e.target.value)}
-              className="pl-8 font-bold text-foreground"
+              className="pl-8 font-bold text-foreground w-full"
             />
           </div>
 
           {/* Opción para sumar directo a ingresos */}
           {hasDepositAmount && (
-            <label className="flex items-center gap-2 p-2 rounded-xl bg-card border border-border/80 cursor-pointer select-none transition-colors">
+            <label className="flex items-start gap-2.5 p-2.5 rounded-xl bg-card border border-border/80 cursor-pointer select-none transition-colors">
               <input
                 type="checkbox"
                 checked={addToIncome}
                 onChange={(e) => setAddToIncome(e.target.checked)}
-                className="h-4 w-4 rounded accent-primary cursor-pointer"
+                className="h-4 w-4 mt-0.5 rounded accent-primary cursor-pointer shrink-0"
               />
-              <span className="text-xs font-semibold text-foreground flex items-center gap-1">
-                <CheckCircle2 className="h-3.5 w-3.5 text-primary" />
+              <span className="text-xs font-semibold text-foreground flex-1 min-w-0 leading-snug">
                 Sumar ${deposit} directo a los Ingresos de Gastitos 🐾
               </span>
             </label>
@@ -248,10 +247,10 @@ export function TattooModal({
 
         {/* 5. Alertas con Selección Múltiple */}
         <div>
-          <div className="flex items-center justify-between mb-1.5">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 mb-1.5">
             <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-              <Bell className="h-3.5 w-3.5 text-amber-500" />
-              Alertas en tu teléfono (Podés elegir varias)
+              <Bell className="h-3.5 w-3.5 text-amber-500 shrink-0" />
+              <span>Alertas en tu teléfono</span>
             </label>
             <span className="text-[10px] text-primary font-bold">
               {selectedReminders.includes('none')
@@ -267,15 +266,15 @@ export function TattooModal({
                 <div
                   key={opt.id}
                   onClick={() => toggleReminder(opt.id)}
-                  className={`flex items-center justify-between p-2.5 rounded-xl border cursor-pointer select-none transition-all active:scale-98 ${
+                  className={`flex items-center justify-between p-2.5 rounded-xl border cursor-pointer select-none transition-all active:scale-98 min-w-0 ${
                     isChecked
                       ? 'border-primary bg-primary/10 text-primary font-bold ring-1 ring-primary/25'
                       : 'border-border bg-card text-muted-foreground hover:bg-muted'
                   }`}
                 >
-                  <span className="text-xs leading-tight">{opt.label}</span>
+                  <span className="text-xs leading-tight min-w-0 break-words flex-1 pr-2">{opt.label}</span>
                   <div
-                    className={`h-4 w-4 rounded-md border flex items-center justify-center shrink-0 ml-2 transition-colors ${
+                    className={`h-4 w-4 rounded-md border flex items-center justify-center shrink-0 transition-colors ${
                       isChecked
                         ? 'border-primary bg-primary text-primary-foreground'
                         : 'border-muted-foreground/40'

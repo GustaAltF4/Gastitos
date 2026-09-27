@@ -63,7 +63,7 @@ export function Dialog({ open, onOpenChange, children, slideFromBottom = false }
               mass: 0.8,
             }}
             style={{ willChange: "transform, opacity" }}
-            className="relative z-50 w-full max-w-lg bg-card border border-border p-6 shadow-2xl rounded-t-3xl sm:rounded-2xl max-h-[92vh] overflow-y-auto hardware-accelerated"
+            className="relative z-50 w-full max-w-lg bg-card border border-border p-4 sm:p-6 shadow-2xl rounded-t-3xl sm:rounded-2xl max-h-[92vh] overflow-y-auto overflow-x-hidden hardware-accelerated"
           >
             <button
               onClick={() => onOpenChange(false)}
