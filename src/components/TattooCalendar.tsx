@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useMemo } from 'react'
 import { TattooAppointment, TattooReminderOption } from '../types/finance'
-import { formatCurrency } from '../lib/utils'
+import { formatCurrency, getLocalDateString } from '../lib/utils'
 import { Card, CardHeader, CardTitle, CardContent } from './ui/card'
 import { Button } from './ui/button'
 import {
@@ -52,7 +52,7 @@ function generateRollingCalendarDays() {
   for (let offset = -1; offset <= 6; offset++) {
     const d = new Date()
     d.setDate(d.getDate() + offset)
-    const dateStr = d.toISOString().slice(0, 10)
+    const dateStr = getLocalDateString(d)
     let label = shortNames[d.getDay()]
     if (offset === -1) label = 'Ayer'
     else if (offset === 0) label = 'Hoy'
@@ -81,7 +81,7 @@ export function TattooCalendar({
   currency,
 }: TattooCalendarProps) {
   const rollingDays = useMemo(() => generateRollingCalendarDays(), [])
-  const todayStr = new Date().toISOString().slice(0, 10)
+  const todayStr = getLocalDateString()
 
   const [activeDate, setActiveDate] = useState<string>(todayStr)
   const columnRefs = useRef<Record<string, HTMLDivElement | null>>({})

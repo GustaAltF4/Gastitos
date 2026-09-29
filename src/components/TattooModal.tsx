@@ -3,6 +3,7 @@ import { Dialog, DialogHeader, DialogTitle, DialogDescription, DialogFooter } fr
 import { Button } from './ui/button'
 import { Input } from './ui/input'
 import { TattooAppointment, TattooReminderOption } from '../types/finance'
+import { getLocalDateString } from '../lib/utils'
 import { Sparkles, Calendar, Clock, DollarSign, Bell, PawPrint, CheckCircle2, Check } from 'lucide-react'
 
 interface TattooModalProps {
@@ -23,7 +24,7 @@ function generateRollingDays() {
   for (let offset = -1; offset <= 6; offset++) {
     const d = new Date()
     d.setDate(d.getDate() + offset)
-    const dateStr = d.toISOString().slice(0, 10)
+    const dateStr = getLocalDateString(d)
     let label = shortNames[d.getDay()]
     if (offset === -1) label = 'Ayer'
     else if (offset === 0) label = 'Hoy'
@@ -58,7 +59,7 @@ export function TattooModal({
   initialDate,
 }: TattooModalProps) {
   const rollingDays = generateRollingDays()
-  const todayStr = new Date().toISOString().slice(0, 10)
+  const todayStr = getLocalDateString()
 
   const [clientName, setClientName] = useState('')
   const [selectedDate, setSelectedDate] = useState<string>(initialDate || todayStr)
@@ -72,7 +73,7 @@ export function TattooModal({
       if (initialDate) {
         setSelectedDate(initialDate)
       } else {
-        setSelectedDate(new Date().toISOString().slice(0, 10))
+        setSelectedDate(getLocalDateString())
       }
     }
   }, [open, initialDate])

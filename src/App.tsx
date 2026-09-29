@@ -14,7 +14,7 @@ import { TattooCalendar } from './components/TattooCalendar'
 import { TattooModal } from './components/TattooModal'
 import { SettingsTab } from './components/SettingsTab'
 import { Card } from './components/ui/card'
-import { formatCurrency } from './lib/utils'
+import { formatCurrency, getLocalDateString } from './lib/utils'
 import { generatePdfReport } from './services/pdfReport'
 import {
   LayoutDashboard,
@@ -51,7 +51,7 @@ export function App() {
   const [isTxModalOpen, setIsTxModalOpen] = useState(false)
   const [isReminderModalOpen, setIsReminderModalOpen] = useState(false)
   const [isTattooModalOpen, setIsTattooModalOpen] = useState(false)
-  const [selectedTattooDate, setSelectedTattooDate] = useState<string>(new Date().toISOString().slice(0, 10))
+  const [selectedTattooDate, setSelectedTattooDate] = useState<string>(getLocalDateString())
   const [tattooAppointments, setTattooAppointments] = useState<TattooAppointment[]>([])
 
   // Aplicar clases de tema, modo oscuro y redondeo de bordes (--radius)
@@ -199,7 +199,7 @@ export function App() {
 
   // Manejo de Turnos de Tattoo
   const handleOpenAddTattoo = (date?: string) => {
-    setSelectedTattooDate(date || new Date().toISOString().slice(0, 10))
+    setSelectedTattooDate(date || getLocalDateString())
     setIsTattooModalOpen(true)
   }
 
@@ -221,7 +221,7 @@ export function App() {
         amount: apptData.deposit,
         category: 'Ingresos',
         scope: 'business',
-        date: new Date().toISOString().slice(0, 10),
+        date: getLocalDateString(),
         description: `Seña Tattoo - ${apptData.clientName}`,
         createdAt: new Date().toISOString(),
       }

@@ -3,6 +3,7 @@ import { Dialog, DialogHeader, DialogTitle, DialogDescription, DialogFooter } fr
 import { Button } from './ui/button'
 import { Input } from './ui/input'
 import { Transaction, TransactionType, TransactionScope, DEFAULT_CATEGORIES } from '../types/finance'
+import { getLocalDateString } from '../lib/utils'
 import { ArrowDownRight, ArrowUpRight, Briefcase, User, Plus, X, PawPrint } from 'lucide-react'
 
 interface TransactionModalProps {
@@ -25,7 +26,7 @@ export function TransactionModal({
   const [description, setDescription] = useState('')
   const [category, setCategory] = useState('')
   const [scope, setScope] = useState<TransactionScope>('business')
-  const [date, setDate] = useState(new Date().toISOString().split('T')[0])
+  const [date, setDate] = useState(getLocalDateString())
   const [isCreatingCategory, setIsCreatingCategory] = useState(false)
   const [newCategoryName, setNewCategoryName] = useState('')
 

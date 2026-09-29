@@ -1,5 +1,6 @@
 import { Preferences } from '@capacitor/preferences'
 import { Transaction, Reminder, TattooAppointment, DEFAULT_CATEGORIES } from '../types/finance'
+import { getLocalDateString } from '../lib/utils'
 
 const TRANSACTIONS_KEY = 'app_gastos_transactions'
 const REMINDERS_KEY = 'app_gastos_reminders'
@@ -13,8 +14,7 @@ export function getMondayOfWeek(d: Date = new Date()): string {
   const day = date.getDay()
   const diff = date.getDate() - (day === 0 ? 6 : day - 1)
   const monday = new Date(date.setDate(diff))
-  monday.setHours(0, 0, 0, 0)
-  return monday.toISOString().slice(0, 10)
+  return getLocalDateString(monday)
 }
 
 export type ThemeColor = 'emerald' | 'indigo' | 'violet' | 'amber' | 'cyan' | 'rose' | 'neutral'
@@ -159,7 +159,7 @@ export const storageService = {
     try {
       const yesterday = new Date()
       yesterday.setDate(yesterday.getDate() - 1)
-      const yesterdayStr = yesterday.toISOString().slice(0, 10)
+      const yesterdayStr = getLocalDateString(yesterday)
 
       const { value } = await Preferences.get({ key: TATTOO_APPOINTMENTS_KEY })
       if (!value) return []
