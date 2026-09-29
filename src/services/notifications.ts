@@ -1,6 +1,10 @@
+import { Capacitor } from '@capacitor/core'
 import { LocalNotifications } from '@capacitor/local-notifications'
 import { Reminder, TattooAppointment, TattooReminderOption } from '../types/finance'
 import { formatCurrency } from '../lib/utils'
+
+// Almacén en memoria de temporizadores web activos
+const activeWebTimers = new Map<number, ReturnType<typeof setTimeout>>()
 
 // Calcular fecha y hora de la alerta según la opción elegida por la tatuadora
 export function calculateTattooAlertDate(
@@ -15,6 +19,10 @@ export function calculateTattooAlertDate(
 
   if (option === 'exact_time') {
     return appDate
+  }
+
+  if (option === '10_min_before') {
+    return new Date(appDate.getTime() - 10 * 60 * 1000)
   }
 
   if (option === '2_hours_before') {
@@ -40,7 +48,6 @@ export function calculateTattooAlertDate(
 
   return null
 }
-
 
 // Sintetizador de sonido chime / campana agradable con Web Audio API (funciona offline, web y móvil)
 export function playChimeSound() {
@@ -86,9 +93,56 @@ export function playChimeSound() {
   }
 }
 
+// Mostrar notificación en navegador Web / PWA usando ServiceWorker (indispensable para Android Chrome e iOS Safari)
+export async function showWebNotification(title: string, body: string, id?: number): Promise<boolean> {
+  // 1. Sonido acústico y vibración inmediata
+  playChimeSound()
+  if ('vibrate' in navigator) {
+    try {
+      navigator.vibrate([200, 100, 200])
+    } catch {}
+  }
+
+  // 2. Verificar soporte y permisos
+  if (!('Notification' in window) || Notification.permission !== 'granted') {
+    return false
+  }
+
+  const notifOptions: NotificationOptions = {
+    body,
+    icon: '/favicon.svg',
+    badge: '/favicon.svg',
+    tag: id ? String(id) : 'gastitos-alert',
+  }
+
+  // 3. Método recomendado y obligatorio para móviles: Service Worker
+  if ('serviceWorker' in navigator) {
+    try {
+      const reg = await navigator.serviceWorker.ready
+      if (reg && 'showNotification' in reg) {
+        await reg.showNotification(title, notifOptions)
+        return true
+      }
+    } catch (e) {
+      console.warn('ServiceWorker showNotification falló, probando constructor directo', e)
+    }
+  }
+
+  // 4. Fallback directo para navegadores de escritorio
+  try {
+    new Notification(title, notifOptions)
+    return true
+  } catch (e) {
+    console.warn('Constructor Notification no disponible en este dispositivo', e)
+  }
+
+  return false
+}
+
 export const notificationService = {
-  // Inicializar canal de notificación de alta prioridad en Android
+  // Inicializar canal de notificación de alta prioridad en Android nativo
   async initChannels(): Promise<void> {
+    if (!Capacitor.isNativePlatform()) return
     try {
       await LocalNotifications.createChannel({
         id: 'gastos_reminders_channel',
@@ -106,19 +160,28 @@ export const notificationService = {
     }
   },
 
-  // Solicitar permisos de notificación (Android 13+ y iOS requieren permiso explícito)
+  // Solicitar permisos de notificación de forma adecuada según la plataforma
   async requestPermission(): Promise<boolean> {
-    try {
-      const status = await LocalNotifications.requestPermissions()
-      return status.display === 'granted'
-    } catch {
-      // Fallback para navegador web estándar si no está corriendo en Android/iOS nativo
-      if ('Notification' in window) {
+    if (Capacitor.isNativePlatform()) {
+      try {
+        const status = await LocalNotifications.requestPermissions()
+        return status.display === 'granted'
+      } catch {
+        return false
+      }
+    }
+
+    // Navegador Web / PWA (Android Chrome, iOS Safari, etc.)
+    if ('Notification' in window) {
+      try {
+        if (Notification.permission === 'granted') return true
         const perm = await Notification.requestPermission()
         return perm === 'granted'
+      } catch {
+        return false
       }
-      return false
     }
+    return false
   },
 
   // Programar un recordatorio con fecha y hora personalizada
@@ -129,49 +192,47 @@ export const notificationService = {
 
     const amountText = reminder.amount ? ` - Monto: ${formatCurrency(reminder.amount, currency)}` : ''
     const body = `${reminder.notes || 'Recordatorio de pago pendiente'}${amountText}`
+    const title = `🔔 ${reminder.title}`
 
     // Si la fecha ya pasó, no programar en el pasado
     if (targetDate.getTime() <= now.getTime()) {
       return id
     }
 
-    await this.initChannels()
-
-    try {
-      await LocalNotifications.schedule({
-        notifications: [
-          {
-            title: `🔔 ${reminder.title}`,
-            body: body,
-            id: id,
-            channelId: 'gastos_reminders_channel',
-            schedule: {
-              at: targetDate,
-              allowWhileIdle: true, // Despierta el celular incluso en modo ahorro (Doze)
+    if (Capacitor.isNativePlatform()) {
+      await this.initChannels()
+      try {
+        await LocalNotifications.schedule({
+          notifications: [
+            {
+              title,
+              body,
+              id,
+              channelId: 'gastos_reminders_channel',
+              schedule: {
+                at: targetDate,
+                allowWhileIdle: true,
+              },
+              sound: 'beep.wav',
+              actionTypeId: '',
+              extra: {
+                reminderId: reminder.id,
+              },
             },
-            sound: 'beep.wav',
-            actionTypeId: '',
-            extra: {
-              reminderId: reminder.id,
-            },
-          },
-        ],
-      })
-    } catch (error) {
-      console.warn('Capacitor LocalNotifications no disponible en este entorno, usando fallback web', error)
-      
-      // Fallback web: si la pestaña sigue abierta
+          ],
+        })
+      } catch (error) {
+        console.warn('Error al programar recordatorio nativo', error)
+      }
+    } else {
+      // En Web / PWA
       const delayMs = targetDate.getTime() - now.getTime()
-      if (delayMs > 0 && delayMs < 24 * 60 * 60 * 1000) {
-        setTimeout(() => {
-          playChimeSound()
-          if ('Notification' in window && Notification.permission === 'granted') {
-            new Notification(`🔔 ${reminder.title}`, {
-              body: body,
-              icon: '/favicon.ico',
-            })
-          }
+      if (delayMs > 0 && delayMs < 7 * 24 * 60 * 60 * 1000) {
+        const timer = setTimeout(() => {
+          showWebNotification(title, body, id)
+          activeWebTimers.delete(id)
         }, delayMs)
+        activeWebTimers.set(id, timer)
       }
     }
 
@@ -181,50 +242,63 @@ export const notificationService = {
   // Cancelar una notificación programada
   async cancelNotification(notificationId: number): Promise<void> {
     if (!notificationId) return
-    try {
-      await LocalNotifications.cancel({
-        notifications: [{ id: notificationId }],
-      })
-    } catch (e) {
-      console.warn('No se pudo cancelar la notificación nativa', e)
+
+    // Cancelar temporizador web si existe
+    const timer = activeWebTimers.get(notificationId)
+    if (timer) {
+      clearTimeout(timer)
+      activeWebTimers.delete(notificationId)
+    }
+
+    if (Capacitor.isNativePlatform()) {
+      try {
+        await LocalNotifications.cancel({
+          notifications: [{ id: notificationId }],
+        })
+      } catch (e) {
+        console.warn('No se pudo cancelar la notificación nativa', e)
+      }
     }
   },
 
   // Disparar una notificación de prueba inmediata con sonido audible y vibración
   async triggerTestNotification(): Promise<void> {
-    // 1. Sonido acústico y vibración inmediata asegurada
+    // 1. Sonido acústico y vibración inmediata
     playChimeSound()
     if ('vibrate' in navigator) {
       try {
-        navigator.vibrate([150, 80, 150])
+        navigator.vibrate([200, 100, 200])
       } catch {}
     }
 
-    // 2. Notificación en el sistema móvil o navegador
-    try {
-      await this.initChannels()
-      const hasPermission = await this.requestPermission()
-      if (hasPermission) {
-        await LocalNotifications.schedule({
-          notifications: [
-            {
-              title: '🔔 ¡Prueba de Alerta Exitosa!',
-              body: 'Tus recordatorios y avisos de pago sonarán en tu celular en la fecha y hora que elijas.',
-              id: 9999,
-              channelId: 'gastos_reminders_channel',
-              schedule: { at: new Date(Date.now() + 1000) },
-              sound: 'beep.wav',
-            },
-          ],
-        })
+    const title = '🔔 ¡Prueba de Alerta Exitosa!'
+    const body = 'Tus recordatorios y avisos de turnos sonarán en tu celular en la fecha y hora elegida.'
+
+    if (Capacitor.isNativePlatform()) {
+      try {
+        await this.initChannels()
+        const hasPermission = await this.requestPermission()
+        if (hasPermission) {
+          await LocalNotifications.schedule({
+            notifications: [
+              {
+                title,
+                body,
+                id: 9999,
+                channelId: 'gastos_reminders_channel',
+                schedule: { at: new Date(Date.now() + 1000) },
+                sound: 'beep.wav',
+              },
+            ],
+          })
+        }
+      } catch (err) {
+        console.warn('Fallo test nativo', err)
       }
-    } catch {
-      if ('Notification' in window && Notification.permission === 'granted') {
-        new Notification('🔔 ¡Prueba de Alerta Exitosa!', {
-          body: 'Tus recordatorios y avisos de pago sonarán en tu celular en la fecha y hora que elijas.',
-          icon: '/favicon.ico',
-        })
-      }
+    } else {
+      // En Web / PWA: solicitar permiso explícito y disparar vía Service Worker
+      await this.requestPermission()
+      await showWebNotification(title, body, 9999)
     }
   },
 
@@ -238,11 +312,17 @@ export const notificationService = {
     const scheduledIds: number[] = []
     const now = new Date()
 
-    await this.initChannels()
-    await this.requestPermission()
+    if (Capacitor.isNativePlatform()) {
+      await this.initChannels()
+      await this.requestPermission()
+    } else {
+      // Asegurar permisos en Web
+      await this.requestPermission()
+    }
 
     for (const opt of activeOptions) {
       const alertDate = calculateTattooAlertDate(appointment.date, appointment.time, opt)
+      // Si la alerta ya pasó, no se puede programar en el pasado
       if (!alertDate || alertDate.getTime() <= now.getTime()) continue
 
       const id = Math.floor(Math.random() * 900000) + 100000
@@ -251,43 +331,46 @@ export const notificationService = {
       else if (opt === '1_day_before') label = 'Mañana tienes turno'
       else if (opt === 'same_day_morning') label = 'Hoy tienes turno'
       else if (opt === '2_hours_before') label = 'En 2 horas comienza el turno'
+      else if (opt === '10_min_before') label = 'En 10 minutos comienza el turno'
       else label = 'Turno ahora'
 
       const body = `${label} con ${appointment.clientName} a las ${appointment.time} hs`
+      const title = `🖋️ Agenda Tattoo: ${appointment.clientName}`
 
-      try {
-        await LocalNotifications.schedule({
-          notifications: [
-            {
-              title: `🖋️ Agenda Tattoo: ${appointment.clientName}`,
-              body: body,
-              id: id,
-              channelId: 'gastos_reminders_channel',
-              schedule: {
-                at: alertDate,
-                allowWhileIdle: true,
+      if (Capacitor.isNativePlatform()) {
+        try {
+          await LocalNotifications.schedule({
+            notifications: [
+              {
+                title,
+                body,
+                id,
+                channelId: 'gastos_reminders_channel',
+                schedule: {
+                  at: alertDate,
+                  allowWhileIdle: true,
+                },
+                sound: 'beep.wav',
+                extra: {
+                  tattooId: appointment.id,
+                },
               },
-              sound: 'beep.wav',
-              extra: {
-                tattooId: appointment.id,
-              },
-            },
-          ],
-        })
-        scheduledIds.push(id)
-      } catch (error) {
-        console.warn('Capacitor LocalNotifications fallback web para tattoo', error)
+            ],
+          })
+          scheduledIds.push(id)
+        } catch (error) {
+          console.warn('Error en schedule nativo', error)
+        }
+      } else {
+        // En Web / PWA: usar temporizador local con showWebNotification (Service Worker)
         const delayMs = alertDate.getTime() - now.getTime()
-        if (delayMs > 0 && delayMs < 24 * 60 * 60 * 1000) {
-          setTimeout(() => {
-            playChimeSound()
-            if ('Notification' in window && Notification.permission === 'granted') {
-              new Notification(`🖋️ Agenda Tattoo: ${appointment.clientName}`, {
-                body: body,
-                icon: '/favicon.svg',
-              })
-            }
+        if (delayMs > 0 && delayMs < 7 * 24 * 60 * 60 * 1000) {
+          const timer = setTimeout(() => {
+            showWebNotification(title, body, id)
+            activeWebTimers.delete(id)
           }, delayMs)
+          activeWebTimers.set(id, timer)
+          scheduledIds.push(id)
         }
       }
     }

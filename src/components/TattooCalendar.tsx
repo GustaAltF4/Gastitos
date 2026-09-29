@@ -32,6 +32,8 @@ function getReminderLabel(option: TattooReminderOption): string {
       return '📅 2 días antes'
     case '2_hours_before':
       return '⏰ 2hs antes'
+    case '10_min_before':
+      return '⚡ 10m antes'
     case 'exact_time':
       return '🔔 Hora exacta'
     default:

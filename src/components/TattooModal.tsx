@@ -4,6 +4,7 @@ import { Button } from './ui/button'
 import { Input } from './ui/input'
 import { TattooAppointment, TattooReminderOption } from '../types/finance'
 import { getLocalDateString } from '../lib/utils'
+import { calculateTattooAlertDate, notificationService } from '../services/notifications'
 import { Sparkles, Calendar, Clock, DollarSign, Bell, PawPrint, CheckCircle2, Check } from 'lucide-react'
 
 interface TattooModalProps {
@@ -43,12 +44,20 @@ function generateRollingDays() {
   return days
 }
 
+function isOptionInPast(date: string, time: string, option: TattooReminderOption): boolean {
+  if (option === 'none') return false
+  const alertDate = calculateTattooAlertDate(date, time, option)
+  if (!alertDate) return false
+  return alertDate.getTime() <= Date.now()
+}
+
 const REMINDER_OPTIONS: { id: TattooReminderOption; label: string }[] = [
-  { id: '2_days_before', label: '📅 2 días antes (12:00 PM)' },
-  { id: '1_day_before', label: '⏳ 1 día antes (18:00 PM)' },
-  { id: 'same_day_morning', label: '🌅 El mismo día (09:00 AM)' },
+  { id: 'exact_time', label: '🔔 A la hora exacta del turno' },
+  { id: '10_min_before', label: '⚡ 10m antes (preparación)' },
   { id: '2_hours_before', label: '⏰ 2 horas antes de la sesión' },
-  { id: 'exact_time', label: '🔔 A la hora exacta' },
+  { id: 'same_day_morning', label: '🌅 El mismo día (09:00 AM)' },
+  { id: '1_day_before', label: '⏳ 1 día antes (18:00 PM)' },
+  { id: '2_days_before', label: '📅 2 días antes (12:00 PM)' },
   { id: 'none', label: '🔕 Sin notificación' },
 ]
 
@@ -66,26 +75,37 @@ export function TattooModal({
   const [time, setTime] = useState('15:00')
   const [deposit, setDeposit] = useState('')
   const [addToIncome, setAddToIncome] = useState(true)
-  const [selectedReminders, setSelectedReminders] = useState<TattooReminderOption[]>(['1_day_before'])
+  const [selectedReminders, setSelectedReminders] = useState<TattooReminderOption[]>(['exact_time'])
 
   useEffect(() => {
     if (open) {
-      if (initialDate) {
-        setSelectedDate(initialDate)
+      const initial = initialDate || getLocalDateString()
+      setSelectedDate(initial)
+      // Si la fecha es hoy, el default seguro es la hora exacta; si es fecha futura, 1 día antes y hora exacta
+      if (initial === getLocalDateString()) {
+        setSelectedReminders(['exact_time'])
       } else {
-        setSelectedDate(getLocalDateString())
+        setSelectedReminders(['1_day_before', 'exact_time'])
       }
     }
   }, [open, initialDate])
 
-  const toggleReminder = (optionId: TattooReminderOption) => {
+  const toggleReminder = async (optionId: TattooReminderOption) => {
     if (optionId === 'none') {
-      // Si selecciona "sin notificación", desactiva todas las demás
       setSelectedReminders(['none'])
       return
     }
 
-    // Si ya tenía "none", lo quitamos primero
+    // Solicitar permiso de notificación inmediatamente en el gesto del usuario
+    await notificationService.requestPermission()
+
+    // Comprobar si el horario ya pasó para la fecha/hora seleccionada
+    const isPast = isOptionInPast(selectedDate, time, optionId)
+    if (isPast) {
+      alert('Esta alerta corresponde a un horario que ya pasó para la fecha u hora elegida.')
+      return
+    }
+
     const withoutNone = selectedReminders.filter((r) => r !== 'none')
 
     if (withoutNone.includes(optionId)) {
@@ -263,25 +283,33 @@ export function TattooModal({
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
             {REMINDER_OPTIONS.map((opt) => {
               const isChecked = selectedReminders.includes(opt.id)
+              const isPast = isOptionInPast(selectedDate, time, opt.id)
               return (
                 <div
                   key={opt.id}
-                  onClick={() => toggleReminder(opt.id)}
-                  className={`flex items-center justify-between p-2.5 rounded-xl border cursor-pointer select-none transition-all active:scale-98 min-w-0 ${
-                    isChecked
-                      ? 'border-primary bg-primary/10 text-primary font-bold ring-1 ring-primary/25'
-                      : 'border-border bg-card text-muted-foreground hover:bg-muted'
+                  onClick={() => !isPast && toggleReminder(opt.id)}
+                  className={`flex items-center justify-between p-2.5 rounded-xl border select-none transition-all min-w-0 ${
+                    isPast
+                      ? 'opacity-40 bg-muted/20 border-border/50 cursor-not-allowed text-muted-foreground'
+                      : isChecked
+                      ? 'border-primary bg-primary/10 text-primary font-bold ring-1 ring-primary/25 cursor-pointer active:scale-98'
+                      : 'border-border bg-card text-muted-foreground hover:bg-muted cursor-pointer active:scale-98'
                   }`}
                 >
-                  <span className="text-xs leading-tight min-w-0 break-words flex-1 pr-2">{opt.label}</span>
+                  <span className="text-xs leading-tight min-w-0 break-words flex-1 pr-2">
+                    {opt.label}
+                    {isPast && <span className="block text-[10px] text-muted-foreground font-normal">(horario ya transcurrido)</span>}
+                  </span>
                   <div
                     className={`h-4 w-4 rounded-md border flex items-center justify-center shrink-0 transition-colors ${
-                      isChecked
+                      isPast
+                        ? 'border-muted-foreground/20 bg-transparent'
+                        : isChecked
                         ? 'border-primary bg-primary text-primary-foreground'
                         : 'border-muted-foreground/40'
                     }`}
                   >
-                    {isChecked && <Check className="h-3 w-3 stroke-[3]" />}
+                    {isChecked && !isPast && <Check className="h-3 w-3 stroke-[3]" />}
                   </div>
                 </div>
               )

@@ -47,6 +47,7 @@ export type TattooReminderOption =
   | '1_day_before'     // 1 día antes a las 18:00 PM
   | '2_days_before'    // 2 días antes a las 12:00 PM
   | '2_hours_before'   // 2 horas antes de la sesión
+  | '10_min_before'    // 10 minutos antes (preparación y aviso cercano)
   | 'exact_time'       // A la hora exacta del turno
   | 'none'
 
