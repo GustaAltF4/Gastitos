@@ -149,7 +149,7 @@ export function TattooModal({
           </label>
           <Input
             required
-            placeholder="Ej: Sofía Ramírez"
+            placeholder="Ej: 😡😡😡"
             value={clientName}
             onChange={(e) => setClientName(e.target.value)}
             className="text-base font-semibold w-full"
