@@ -6,6 +6,13 @@ import { formatCurrency } from '../lib/utils'
 // Almacén en memoria de temporizadores web activos
 const activeWebTimers = new Map<number, ReturnType<typeof setTimeout>>()
 
+// Helper para parsear fecha y hora local de forma 100% segura en iOS WebKit / Safari
+export function parseLocalDateTime(dateStr: string, timeStr: string): Date {
+  const [year, month, day] = dateStr.split('-').map(Number)
+  const [hours, minutes] = timeStr.split(':').map(Number)
+  return new Date(year, month - 1, day, hours || 0, minutes || 0, 0)
+}
+
 // Calcular fecha y hora de la alerta según la opción elegida por la tatuadora
 export function calculateTattooAlertDate(
   appointmentDate: string, // YYYY-MM-DD
@@ -14,7 +21,7 @@ export function calculateTattooAlertDate(
 ): Date | null {
   if (option === 'none') return null
 
-  const appDate = new Date(`${appointmentDate}T${appointmentTime}:00`)
+  const appDate = parseLocalDateTime(appointmentDate, appointmentTime)
   if (isNaN(appDate.getTime())) return null
 
   if (option === 'exact_time') {
@@ -30,20 +37,22 @@ export function calculateTattooAlertDate(
   }
 
   if (option === 'same_day_morning') {
-    const d = new Date(`${appointmentDate}T09:00:00`)
-    return d
+    const [y, m, d] = appointmentDate.split('-').map(Number)
+    return new Date(y, m - 1, d, 9, 0, 0)
   }
 
   if (option === '1_day_before') {
-    const d = new Date(`${appointmentDate}T18:00:00`)
-    d.setDate(d.getDate() - 1)
-    return d
+    const [y, m, d] = appointmentDate.split('-').map(Number)
+    const target = new Date(y, m - 1, d, 18, 0, 0)
+    target.setDate(target.getDate() - 1)
+    return target
   }
 
   if (option === '2_days_before') {
-    const d = new Date(`${appointmentDate}T12:00:00`)
-    d.setDate(d.getDate() - 2)
-    return d
+    const [y, m, d] = appointmentDate.split('-').map(Number)
+    const target = new Date(y, m - 1, d, 12, 0, 0)
+    target.setDate(target.getDate() - 2)
+    return target
   }
 
   return null

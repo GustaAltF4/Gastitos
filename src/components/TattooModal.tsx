@@ -5,6 +5,7 @@ import { Input } from './ui/input'
 import { TattooAppointment, TattooReminderOption } from '../types/finance'
 import { getLocalDateString } from '../lib/utils'
 import { calculateTattooAlertDate, notificationService } from '../services/notifications'
+import { exportToIosCalendar } from '../services/calendarExport'
 import { Sparkles, Calendar, Clock, DollarSign, Bell, PawPrint, CheckCircle2, Check } from 'lucide-react'
 
 interface TattooModalProps {
@@ -61,6 +62,13 @@ const REMINDER_OPTIONS: { id: TattooReminderOption; label: string }[] = [
   { id: 'none', label: '🔕 Sin notificación' },
 ]
 
+function getNextUpcomingHour(): string {
+  const now = new Date()
+  const nextHour = now.getHours() + 1
+  if (nextHour >= 24) return '11:00'
+  return `${String(nextHour).padStart(2, '0')}:00`
+}
+
 export function TattooModal({
   open,
   onOpenChange,
@@ -72,19 +80,22 @@ export function TattooModal({
 
   const [clientName, setClientName] = useState('')
   const [selectedDate, setSelectedDate] = useState<string>(initialDate || todayStr)
-  const [time, setTime] = useState('15:00')
+  const [time, setTime] = useState(getNextUpcomingHour())
   const [deposit, setDeposit] = useState('')
   const [addToIncome, setAddToIncome] = useState(true)
+  const [syncCalendar, setSyncCalendar] = useState(true)
   const [selectedReminders, setSelectedReminders] = useState<TattooReminderOption[]>(['exact_time'])
 
   useEffect(() => {
     if (open) {
       const initial = initialDate || getLocalDateString()
       setSelectedDate(initial)
-      // Si la fecha es hoy, el default seguro es la hora exacta; si es fecha futura, 1 día antes y hora exacta
+      // Si la fecha es hoy, el horario y alertas se configuran en el futuro garantizado
       if (initial === getLocalDateString()) {
+        setTime(getNextUpcomingHour())
         setSelectedReminders(['exact_time'])
       } else {
+        setTime('15:00')
         setSelectedReminders(['1_day_before', 'exact_time'])
       }
     }
@@ -125,23 +136,31 @@ export function TattooModal({
 
     const numericDeposit = deposit ? parseFloat(deposit) : undefined
 
-    onSave(
-      {
-        clientName: clientName.trim(),
-        date: selectedDate,
-        time,
-        deposit: numericDeposit && !isNaN(numericDeposit) ? numericDeposit : undefined,
-        reminderOptions: selectedReminders,
-      },
-      addToIncome && !!numericDeposit && numericDeposit > 0
-    )
+    const apptData: Omit<TattooAppointment, 'id' | 'createdAt'> = {
+      clientName: clientName.trim(),
+      date: selectedDate,
+      time,
+      deposit: numericDeposit && !isNaN(numericDeposit) ? numericDeposit : undefined,
+      reminderOptions: selectedReminders,
+    }
+
+    onSave(apptData, addToIncome && !!numericDeposit && numericDeposit > 0)
+
+    // Si está habilitada la sincronización con Apple Calendar, exportar evento .ics nativo
+    if (syncCalendar) {
+      exportToIosCalendar({
+        ...apptData,
+        id: crypto.randomUUID(),
+        createdAt: new Date().toISOString(),
+      })
+    }
 
     // Resetear formulario
     setClientName('')
-    setTime('15:00')
+    setTime(getNextUpcomingHour())
     setDeposit('')
     setAddToIncome(true)
-    setSelectedReminders(['1_day_before'])
+    setSelectedReminders(['exact_time'])
     onOpenChange(false)
   }
 
@@ -316,6 +335,25 @@ export function TattooModal({
             })}
           </div>
         </div>
+
+        {/* Opción de sincronizar directamente con el Calendario nativo de iPhone */}
+        <label className="flex items-start gap-2.5 p-3 rounded-2xl bg-primary/10 border border-primary/25 cursor-pointer select-none transition-colors">
+          <input
+            type="checkbox"
+            checked={syncCalendar}
+            onChange={(e) => setSyncCalendar(e.target.checked)}
+            className="h-4 w-4 mt-0.5 rounded accent-primary cursor-pointer shrink-0"
+          />
+          <div className="flex-1 min-w-0">
+            <span className="text-xs font-bold text-foreground flex items-center gap-1.5 leading-tight">
+              <Calendar className="h-3.5 w-3.5 text-primary shrink-0" />
+              Guardar en Calendario de iPhone / Recordatorios 🐾
+            </span>
+            <p className="text-[11px] text-muted-foreground mt-0.5 leading-snug">
+              Agrega el turno a tu Calendario de iOS con todas sus alertas para que suene y vibre en tu celular aunque esté bloqueado o la app cerrada.
+            </p>
+          </div>
+        </label>
 
         <DialogFooter className="pt-2">
           <Button
