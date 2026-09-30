@@ -374,12 +374,23 @@ export function SettingsTab({
         </CardHeader>
         <CardContent className="space-y-4">
           {isInstalled ? (
-            <div className="flex items-center gap-3 p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/25 text-emerald-600 dark:text-emerald-400">
-              <Check className="h-5 w-5 shrink-0" />
-              <div className="text-xs">
-                <p className="font-bold">¡Aplicación instalada y activa!</p>
-                <p className="opacity-90">Estás usando Gastitos en modo independiente y con soporte fuera de línea (Offline).</p>
+            <div className="space-y-3">
+              <div className="flex items-center gap-3 p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/25 text-emerald-600 dark:text-emerald-400">
+                <Check className="h-5 w-5 shrink-0" />
+                <div className="text-xs">
+                  <p className="font-bold">¡Aplicación instalada y activa!</p>
+                  <p className="opacity-90">Estás usando Gastitos en modo independiente y con soporte fuera de línea (Offline).</p>
+                </div>
               </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => window.location.reload()}
+                className="w-full text-xs gap-2 font-bold hover:bg-primary/10"
+              >
+                <RotateCcw className="h-3.5 w-3.5 text-primary" />
+                Recargar y buscar actualizaciones 🔄
+              </Button>
             </div>
           ) : isIos ? (
             <div className="p-4 rounded-xl bg-muted/60 border border-border/80 space-y-3">

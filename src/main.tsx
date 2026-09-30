@@ -15,6 +15,8 @@ if ('serviceWorker' in navigator && import.meta.env.PROD) {
     navigator.serviceWorker
       .register('/sw.js')
       .then((reg) => {
+        // Forzar comprobación de versión actualizada en el servidor
+        reg.update()
         console.log('🐾 Gastitos PWA Service Worker activo:', reg.scope)
       })
       .catch((err) => {
