@@ -93,6 +93,9 @@ export function App() {
       setConfig(cfg)
       setTattooAppointments(tattoo)
       applyThemeClasses(cfg.darkMode, cfg.themeColor, cfg.borderRadius)
+
+      // Reprogramar alertas pendientes y turnos futuros que aún no vencieron
+      notificationService.rescheduleAllPending(rems, tattoo, cfg.currency)
     }
     loadData()
   }, [])
