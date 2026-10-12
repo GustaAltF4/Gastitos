@@ -158,12 +158,12 @@
   background: rgba(150, 150, 150, 0.4);
 }
 
-/* Safe area helpers para Notch de iPhone y barra gestual de Android */
+/* Safe area dinámica: detecta automáticamente la altura real de la barra de estado y si Android usa 3 botones o gestos */
 .pb-safe {
-  padding-bottom: env(safe-area-inset-bottom, 12px);
+  padding-bottom: max(env(safe-area-inset-bottom, 0px), var(--safe-area-inset-bottom, 0px));
 }
 .pt-safe {
-  padding-top: env(safe-area-inset-top, 0px);
+  padding-top: max(env(safe-area-inset-top, 0px), var(--safe-area-inset-top, 0px));
 }
 
 /* Optimización de animaciones GPU para celulares y dispositivos de bajos recursos */

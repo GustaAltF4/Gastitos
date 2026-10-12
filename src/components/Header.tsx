@@ -12,11 +12,11 @@ export function Header({
   userName,
 }: HeaderProps) {
   return (
-    <header className="sticky top-0 z-40 w-full border-b border-border/80 bg-background/80 backdrop-blur-md">
-      <div className="container max-w-5xl mx-auto px-4 h-16 flex items-center justify-between gap-3">
+    <header className="sticky top-0 z-40 w-full border-b border-border/80 bg-background/90 backdrop-blur-md pt-safe">
+      <div className="container max-w-5xl mx-auto px-4 h-14 sm:h-16 flex items-center justify-between gap-3">
         {/* Logo / Nombre Gastitos */}
-        <div className="flex items-center gap-3">
-          <div className="relative h-10 w-10 rounded-2xl bg-gradient-to-tr from-primary to-primary/80 flex items-center justify-center text-primary-foreground shadow-md shadow-primary/25 transition-transform duration-200 hover:scale-105 select-none">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="relative h-10 w-10 shrink-0 rounded-2xl bg-gradient-to-tr from-primary to-primary/80 flex items-center justify-center text-primary-foreground shadow-md shadow-primary/25 transition-transform duration-200 hover:scale-105 select-none">
             <Cat className="h-6 w-6" strokeWidth={2.2} />
             <span
               className="absolute -bottom-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-amber-400 text-[10px] text-zinc-950 font-black shadow-sm ring-2 ring-background leading-none select-none"

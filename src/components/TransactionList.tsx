@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import { Transaction } from '../types/finance'
-import { formatCurrency, formatDate } from '../lib/utils'
+import { formatDate } from '../lib/utils'
 import { Card, CardHeader, CardTitle, CardContent } from './ui/card'
 import { Badge } from './ui/badge'
+import { CurrencyText } from './ui/currency-text'
 import { Trash2, Search, Briefcase, User, Cat } from 'lucide-react'
 
 function HappyCatIcon({ className = 'h-7 w-7' }: { className?: string }) {
@@ -70,23 +71,23 @@ export function TransactionList({ transactions, onDelete, currency }: Transactio
             Movimientos ({transactions.length})
           </CardTitle>
 
-          {/* Filtros rápidos */}
-          <div className="flex items-center gap-2">
+          {/* Filtros rápidos adaptables sin comprimir el buscador */}
+          <div className="flex flex-col xs:flex-row sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
             <div className="relative flex-1 sm:w-48">
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
               <input
                 type="text"
-                placeholder="Buscar..."
+                placeholder="Buscar movimiento..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full pl-8 pr-3 py-1.5 text-xs bg-muted/60 border border-input rounded-lg focus:outline-none focus:ring-1 focus:ring-primary"
               />
             </div>
 
-            <div className="flex bg-muted/80 p-0.5 rounded-lg text-xs">
+            <div className="grid grid-cols-3 sm:flex bg-muted/80 p-0.5 rounded-lg text-xs shrink-0">
               <button
                 onClick={() => setTypeFilter('all')}
-                className={`px-2 py-1 rounded-md transition-all ${
+                className={`px-2.5 py-1 rounded-md transition-all text-center ${
                   typeFilter === 'all' ? 'bg-card text-foreground font-semibold shadow-xs' : 'text-muted-foreground'
                 }`}
               >
@@ -94,7 +95,7 @@ export function TransactionList({ transactions, onDelete, currency }: Transactio
               </button>
               <button
                 onClick={() => setTypeFilter('income')}
-                className={`px-2 py-1 rounded-md transition-all ${
+                className={`px-2.5 py-1 rounded-md transition-all text-center ${
                   typeFilter === 'income' ? 'bg-primary text-primary-foreground font-semibold' : 'text-muted-foreground'
                 }`}
               >
@@ -102,7 +103,7 @@ export function TransactionList({ transactions, onDelete, currency }: Transactio
               </button>
               <button
                 onClick={() => setTypeFilter('expense')}
-                className={`px-2 py-1 rounded-md transition-all ${
+                className={`px-2.5 py-1 rounded-md transition-all text-center ${
                   typeFilter === 'expense' ? 'bg-[#991b1b] text-white font-semibold' : 'text-muted-foreground'
                 }`}
               >
@@ -113,7 +114,7 @@ export function TransactionList({ transactions, onDelete, currency }: Transactio
         </div>
       </CardHeader>
 
-      <CardContent>
+      <CardContent className="px-3 sm:px-6">
         {filtered.length === 0 ? (
           <div className="py-10 text-center text-muted-foreground text-sm flex flex-col items-center justify-center gap-2.5">
             <Cat className="h-9 w-9 text-muted-foreground/35 stroke-[1.5]" />
@@ -121,79 +122,85 @@ export function TransactionList({ transactions, onDelete, currency }: Transactio
           </div>
         ) : (
           <div className="divide-y divide-border/60">
-            {filtered.map((tx) => (
-              <div
-                key={tx.id}
-                className="py-3.5 flex items-center justify-between gap-3 group hover:bg-muted/30 px-2 rounded-xl transition-all duration-100 active:scale-[0.99] hardware-accelerated"
-              >
-                <div className="flex items-center gap-3 min-w-0">
-                  <div
-                    className={`h-12 w-12 rounded-2xl shrink-0 flex items-center justify-center transition-transform active:scale-95 select-none shadow-xs ${
-                      tx.type === 'income'
-                        ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/25'
-                        : 'bg-red-950/20 text-[#991b1b] dark:text-red-400 border border-[#991b1b]/25'
-                    }`}
-                  >
-                    {tx.type === 'income' ? (
-                      <HappyCatIcon className="h-7 w-7" />
-                    ) : (
-                      <CatScratchIcon className="h-7 w-7" />
-                    )}
-                  </div>
+            {filtered.map((tx) => {
+              const showSeparateCategory =
+                tx.category &&
+                tx.description.trim().toLowerCase() !== tx.category.trim().toLowerCase()
 
-                  <div className="min-w-0">
-                    <p className="font-semibold text-sm text-foreground truncate">
-                      {tx.description}
-                    </p>
-                    <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                      <span className="text-xs text-muted-foreground">
-                        {formatDate(tx.date)}
-                      </span>
-                      <span className="text-xs text-muted-foreground">•</span>
-                      <span className="text-xs text-muted-foreground truncate">
-                        {tx.category}
-                      </span>
-                      <Badge
-                        variant={tx.scope === 'business' ? 'business' : 'personal'}
-                        className="text-[10px] py-0 px-1.5 font-normal"
-                      >
-                        {tx.scope === 'business' ? (
-                          <span className="flex items-center gap-0.5">
-                            <Briefcase className="h-2.5 w-2.5" /> Negocio
-                          </span>
-                        ) : (
-                          <span className="flex items-center gap-0.5">
-                            <User className="h-2.5 w-2.5" /> Personal
-                          </span>
+              return (
+                <div
+                  key={tx.id}
+                  className="py-3.5 flex items-start sm:items-center justify-between gap-2 sm:gap-3 group hover:bg-muted/30 px-1 sm:px-2 rounded-xl transition-all duration-100 active:scale-[0.99] hardware-accelerated"
+                >
+                  <div className="flex items-start sm:items-center gap-2.5 sm:gap-3 min-w-0 flex-1">
+                    <div
+                      className={`h-10 w-10 sm:h-12 sm:w-12 rounded-2xl shrink-0 flex items-center justify-center transition-transform active:scale-95 select-none shadow-xs mt-0.5 sm:mt-0 ${
+                        tx.type === 'income'
+                          ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/25'
+                          : 'bg-red-950/20 text-[#991b1b] dark:text-red-400 border border-[#991b1b]/25'
+                      }`}
+                    >
+                      {tx.type === 'income' ? (
+                        <HappyCatIcon className="h-6 w-6 sm:h-7 sm:w-7" />
+                      ) : (
+                        <CatScratchIcon className="h-6 w-6 sm:h-7 sm:w-7" />
+                      )}
+                    </div>
+
+                    <div className="min-w-0 flex-1">
+                      <p className="font-semibold text-sm text-foreground break-words leading-snug">
+                        {tx.description}
+                      </p>
+                      <p className="text-[11px] sm:text-xs text-muted-foreground leading-snug mt-0.5">
+                        <span className="whitespace-nowrap">{formatDate(tx.date)}</span>
+                        {showSeparateCategory && (
+                          <span className="break-words"> • {tx.category}</span>
                         )}
-                      </Badge>
+                      </p>
+                      <div className="mt-1">
+                        <Badge
+                          variant={tx.scope === 'business' ? 'business' : 'personal'}
+                          className="text-[10px] py-0 px-1.5 font-normal shrink-0"
+                        >
+                          {tx.scope === 'business' ? (
+                            <span className="flex items-center gap-0.5">
+                              <Briefcase className="h-2.5 w-2.5 shrink-0" /> Negocio
+                            </span>
+                          ) : (
+                            <span className="flex items-center gap-0.5">
+                              <User className="h-2.5 w-2.5 shrink-0" /> Personal
+                            </span>
+                          )}
+                        </Badge>
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                <div className="flex items-center gap-3 shrink-0">
-                  <span
-                    className={`font-bold text-sm sm:text-base ${
-                      tx.type === 'income'
-                        ? 'text-primary'
-                        : 'text-[#991b1b] dark:text-red-400 font-extrabold'
-                    }`}
-                  >
-                    {tx.type === 'income' ? '+' : '-'}
-                    {formatCurrency(tx.amount, currency)}
-                  </span>
+                  <div className="flex items-center justify-end gap-1.5 sm:gap-2.5 shrink-0 max-w-[44%] sm:max-w-[48%] min-w-0 pt-0.5 sm:pt-0">
+                    <CurrencyText
+                      amount={tx.amount}
+                      currency={currency}
+                      sign={tx.type === 'income' ? 'plus' : 'minus'}
+                      autoFit={true}
+                      className={`font-bold text-sm sm:text-base text-right ${
+                        tx.type === 'income'
+                          ? 'text-primary'
+                          : 'text-[#991b1b] dark:text-red-400 font-extrabold'
+                      }`}
+                    />
 
-                  <button
-                    onClick={() => onDelete(tx.id)}
-                    className="h-9 w-9 rounded-xl flex items-center justify-center text-rose-600 dark:text-rose-400 bg-rose-500/10 hover:bg-rose-500/20 active:bg-rose-500/30 border border-rose-500/25 active:scale-90 transition-all select-none shrink-0"
-                    title="Eliminar este movimiento"
-                    aria-label="Eliminar movimiento"
-                  >
-                    <Trash2 className="h-4 w-4 stroke-[2.2]" />
-                  </button>
+                    <button
+                      onClick={() => onDelete(tx.id)}
+                      className="h-8 w-8 sm:h-9 sm:w-9 rounded-xl flex items-center justify-center text-rose-600 dark:text-rose-400 bg-rose-500/10 hover:bg-rose-500/20 active:bg-rose-500/30 border border-rose-500/25 active:scale-90 transition-all select-none shrink-0"
+                      title="Eliminar este movimiento"
+                      aria-label="Eliminar movimiento"
+                    >
+                      <Trash2 className="h-4 w-4 stroke-[2.2]" />
+                    </button>
+                  </div>
                 </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         )}
       </CardContent>
