@@ -2,7 +2,12 @@ import { useState, useEffect, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Transaction, Reminder, TattooAppointment, TransactionScope, DEFAULT_CATEGORIES } from './types/finance'
 import { storageService, UserConfig, RADIUS_VALUES } from './services/storage'
-import { notificationService } from './services/notifications'
+import {
+  notificationService,
+  onNotificationError,
+  clearNotificationError,
+  NotificationErrorInfo,
+} from './services/notifications'
 import { Header } from './components/Header'
 import { BalanceCard } from './components/BalanceCard'
 import { FinanceDashboard } from './components/FinanceDashboard'
@@ -13,8 +18,7 @@ import { ReminderModal } from './components/ReminderModal'
 import { TattooCalendar } from './components/TattooCalendar'
 import { TattooModal } from './components/TattooModal'
 import { SettingsTab } from './components/SettingsTab'
-import { Card } from './components/ui/card'
-import { formatCurrency, getLocalDateString } from './lib/utils'
+import { getLocalDateString } from './lib/utils'
 import { generatePdfReport } from './services/pdfReport'
 import {
   LayoutDashboard,
@@ -26,6 +30,8 @@ import {
   ChevronRight,
   PawPrint,
   Sparkles,
+  AlertTriangle,
+  X,
 } from 'lucide-react'
 
 export function App() {
@@ -53,6 +59,13 @@ export function App() {
   const [isTattooModalOpen, setIsTattooModalOpen] = useState(false)
   const [selectedTattooDate, setSelectedTattooDate] = useState<string>(getLocalDateString())
   const [tattooAppointments, setTattooAppointments] = useState<TattooAppointment[]>([])
+  const [notifError, setNotifError] = useState<NotificationErrorInfo | null>(null)
+
+  useEffect(() => {
+    return onNotificationError((err) => {
+      setNotifError(err)
+    })
+  }, [])
 
   // Aplicar clases de tema, modo oscuro y redondeo de bordes (--radius)
   const applyThemeClasses = (dark: boolean, theme: string, radius: string = 'md') => {
@@ -93,9 +106,6 @@ export function App() {
       setConfig(cfg)
       setTattooAppointments(tattoo)
       applyThemeClasses(cfg.darkMode, cfg.themeColor, cfg.borderRadius)
-
-      // Reprogramar alertas pendientes y turnos futuros que aún no vencieron
-      notificationService.rescheduleAllPending(rems, tattoo, cfg.currency)
     }
     loadData()
   }, [])
@@ -337,6 +347,33 @@ export function App() {
 
       {/* Contenido principal con transición fluida GPU */}
       <main className="container max-w-5xl mx-auto px-4 py-5 flex-1 space-y-6">
+        {notifError && (
+          <div className="p-3.5 rounded-2xl border-2 border-rose-500/60 bg-rose-500/10 text-rose-700 dark:text-rose-300 shadow-sm space-y-1.5 text-xs">
+            <div className="flex items-start justify-between gap-2">
+              <div className="flex items-center gap-1.5 font-black text-rose-600 dark:text-rose-400">
+                <AlertTriangle className="h-4 w-4 shrink-0" />
+                <span>ERROR DE NOTIFICACIÓN [{notifError.code}]</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => clearNotificationError()}
+                className="p-1 rounded-lg hover:bg-rose-500/20 text-rose-600 dark:text-rose-300 shrink-0"
+                title="Cerrar aviso de error"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="font-mono text-[11px] bg-background/80 p-2.5 rounded-xl border border-rose-500/30 space-y-1 text-foreground break-words">
+              <p><strong>Acción:</strong> {notifError.context}</p>
+              <p><strong>Tipo:</strong> {notifError.errorName}</p>
+              <p><strong>Detalle:</strong> {notifError.message}</p>
+              <p>
+                <strong>Estado:</strong> Permiso=&quot;{notifError.permission}&quot; | Modo={notifError.isStandalone ? 'PWA Instalada' : 'Navegador'} | Hora={notifError.timestamp}
+              </p>
+            </div>
+          </div>
+        )}
+
         <AnimatePresence mode="wait">
           <motion.div
             key={activeTab}

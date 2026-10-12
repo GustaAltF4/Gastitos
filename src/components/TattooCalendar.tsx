@@ -1,7 +1,6 @@
 import { useState, useRef, useEffect, useMemo } from 'react'
 import { TattooAppointment, TattooReminderOption } from '../types/finance'
 import { formatCurrency, getLocalDateString } from '../lib/utils'
-import { exportToIosCalendar } from '../services/calendarExport'
 import { Card, CardHeader, CardTitle, CardContent } from './ui/card'
 import { Button } from './ui/button'
 import {
@@ -351,23 +350,13 @@ export function TattooCalendar({
                               {appt.time} hs
                             </span>
 
-                            <div className="flex items-center gap-1">
-                              <button
-                                onClick={() => exportToIosCalendar(appt)}
-                                className="h-7 w-7 rounded-lg text-primary bg-primary/10 hover:bg-primary/20 active:scale-90 flex items-center justify-center transition-all"
-                                title="Guardar en Calendario de iPhone / Recordatorios 📅"
-                              >
-                                <Calendar className="h-3.5 w-3.5" />
-                              </button>
-
-                              <button
-                                onClick={() => onDeleteAppointment(appt.id)}
-                                className="h-7 w-7 rounded-lg text-rose-600 dark:text-rose-400 bg-rose-500/10 hover:bg-rose-500/20 active:scale-90 flex items-center justify-center transition-all"
-                                title="Eliminar este turno"
-                              >
-                                <Trash2 className="h-3.5 w-3.5" />
-                              </button>
-                            </div>
+                            <button
+                              onClick={() => onDeleteAppointment(appt.id)}
+                              className="h-7 w-7 rounded-lg text-rose-600 dark:text-rose-400 bg-rose-500/10 hover:bg-rose-500/20 active:scale-90 flex items-center justify-center transition-all"
+                              title="Eliminar este turno"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
                           </div>
 
                           {/* Nombre del Cliente */}

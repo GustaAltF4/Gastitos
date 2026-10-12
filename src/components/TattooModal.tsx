@@ -4,9 +4,8 @@ import { Button } from './ui/button'
 import { Input } from './ui/input'
 import { TattooAppointment, TattooReminderOption } from '../types/finance'
 import { getLocalDateString } from '../lib/utils'
-import { calculateTattooAlertDate, notificationService } from '../services/notifications'
-import { exportToIosCalendar } from '../services/calendarExport'
-import { Sparkles, Calendar, Clock, DollarSign, Bell, PawPrint, CheckCircle2, Check } from 'lucide-react'
+import { calculateTattooAlertDate } from '../services/notifications'
+import { Sparkles, Calendar, Clock, DollarSign, Bell, PawPrint, Check } from 'lucide-react'
 
 interface TattooModalProps {
   open: boolean
@@ -83,7 +82,6 @@ export function TattooModal({
   const [time, setTime] = useState(getNextUpcomingHour())
   const [deposit, setDeposit] = useState('')
   const [addToIncome, setAddToIncome] = useState(true)
-  const [syncCalendar, setSyncCalendar] = useState(true)
   const [selectedReminders, setSelectedReminders] = useState<TattooReminderOption[]>(['exact_time'])
 
   useEffect(() => {
@@ -101,14 +99,11 @@ export function TattooModal({
     }
   }, [open, initialDate])
 
-  const toggleReminder = async (optionId: TattooReminderOption) => {
+  const toggleReminder = (optionId: TattooReminderOption) => {
     if (optionId === 'none') {
       setSelectedReminders(['none'])
       return
     }
-
-    // Solicitar permiso de notificación inmediatamente en el gesto del usuario
-    await notificationService.requestPermission()
 
     // Comprobar si el horario ya pasó para la fecha/hora seleccionada
     const isPast = isOptionInPast(selectedDate, time, optionId)
@@ -145,15 +140,6 @@ export function TattooModal({
     }
 
     onSave(apptData, addToIncome && !!numericDeposit && numericDeposit > 0)
-
-    // Si está habilitada la sincronización con Apple Calendar, exportar evento .ics nativo
-    if (syncCalendar) {
-      exportToIosCalendar({
-        ...apptData,
-        id: crypto.randomUUID(),
-        createdAt: new Date().toISOString(),
-      })
-    }
 
     // Resetear formulario
     setClientName('')
@@ -335,25 +321,6 @@ export function TattooModal({
             })}
           </div>
         </div>
-
-        {/* Opción de sincronizar directamente con el Calendario nativo de iPhone */}
-        <label className="flex items-start gap-2.5 p-3 rounded-2xl bg-primary/10 border border-primary/25 cursor-pointer select-none transition-colors">
-          <input
-            type="checkbox"
-            checked={syncCalendar}
-            onChange={(e) => setSyncCalendar(e.target.checked)}
-            className="h-4 w-4 mt-0.5 rounded accent-primary cursor-pointer shrink-0"
-          />
-          <div className="flex-1 min-w-0">
-            <span className="text-xs font-bold text-foreground flex items-center gap-1.5 leading-tight">
-              <Calendar className="h-3.5 w-3.5 text-primary shrink-0" />
-              Guardar en Calendario de iPhone / Recordatorios 🐾
-            </span>
-            <p className="text-[11px] text-muted-foreground mt-0.5 leading-snug">
-              Agrega el turno a tu Calendario de iOS con todas sus alertas para que suene y vibre en tu celular aunque esté bloqueado o la app cerrada.
-            </p>
-          </div>
-        </label>
 
         <DialogFooter className="pt-2">
           <Button

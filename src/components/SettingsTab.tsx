@@ -93,8 +93,30 @@ export function SettingsTab({
     onUpdateConfig({ categories: categories.filter((c) => c !== catToRemove) })
   }
 
+  const [isUpdatingPwa, setIsUpdatingPwa] = useState(false)
+
   const handleResetCategories = () => {
     onUpdateConfig({ categories: [...DEFAULT_CATEGORIES] })
+  }
+
+  const handleForceUpdatePwa = async () => {
+    setIsUpdatingPwa(true)
+    try {
+      if ('serviceWorker' in navigator) {
+        const registrations = await navigator.serviceWorker.getRegistrations()
+        for (const reg of registrations) {
+          await reg.update().catch(() => {})
+          await reg.unregister().catch(() => {})
+        }
+      }
+      if ('caches' in window) {
+        const cacheNames = await caches.keys()
+        await Promise.all(cacheNames.map((name) => caches.delete(name)))
+      }
+    } catch (e) {
+      console.warn('Error al limpiar caché de PWA:', e)
+    }
+    window.location.reload()
   }
   return (
     <div className="space-y-6 max-w-4xl mx-auto">
@@ -374,23 +396,12 @@ export function SettingsTab({
         </CardHeader>
         <CardContent className="space-y-4">
           {isInstalled ? (
-            <div className="space-y-3">
-              <div className="flex items-center gap-3 p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/25 text-emerald-600 dark:text-emerald-400">
-                <Check className="h-5 w-5 shrink-0" />
-                <div className="text-xs">
-                  <p className="font-bold">¡Aplicación instalada y activa!</p>
-                  <p className="opacity-90">Estás usando Gastitos en modo independiente y con soporte fuera de línea (Offline).</p>
-                </div>
+            <div className="flex items-center gap-3 p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/25 text-emerald-600 dark:text-emerald-400">
+              <Check className="h-5 w-5 shrink-0" />
+              <div className="text-xs">
+                <p className="font-bold">¡Aplicación instalada y activa!</p>
+                <p className="opacity-90">Estás usando Gastitos en modo independiente y con soporte fuera de línea (Offline).</p>
               </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => window.location.reload()}
-                className="w-full text-xs gap-2 font-bold hover:bg-primary/10"
-              >
-                <RotateCcw className="h-3.5 w-3.5 text-primary" />
-                Recargar y buscar actualizaciones 🔄
-              </Button>
             </div>
           ) : isIos ? (
             <div className="p-4 rounded-xl bg-muted/60 border border-border/80 space-y-3">
@@ -401,7 +412,7 @@ export function SettingsTab({
               <ol className="text-xs text-muted-foreground space-y-1.5 list-decimal list-inside">
                 <li>Abre esta página en el navegador <strong>Safari</strong>.</li>
                 <li>Toca el botón <strong>Compartir</strong> (el cuadrado con la flecha hacia arriba <span className="font-mono text-foreground font-bold">⎋</span>).</li>
-                <li>Baja en el menú y selecciona <strong>"Agregar a pantalla de inicio"</strong>.</li>
+                <li>Baja en el menú y selecciona <strong>&quot;Agregar a pantalla de inicio&quot;</strong>.</li>
               </ol>
               <p className="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium pt-1">
                 🐾 Se creará el acceso directo con ícono de gato, pantalla completa y funcionará sin conexión.
@@ -431,11 +442,33 @@ export function SettingsTab({
               <div>
                 <p className="font-semibold text-foreground">Compatible con todos los navegadores modernos</p>
                 <p className="mt-0.5">
-                  Puedes agregar Gastitos a tu pantalla principal tocando el menú de opciones de tu navegador y seleccionando "Instalar" o "Agregar a pantalla principal".
+                  Puedes agregar Gastitos a tu pantalla principal tocando el menú de opciones de tu navegador y seleccionando &quot;Instalar&quot; o &quot;Agregar a pantalla principal&quot;.
                 </p>
               </div>
             </div>
           )}
+
+          {/* Botón siempre visible para forzar actualización de PWA y limpiar caché de archivos sin borrar datos */}
+          <div className="pt-2 border-t border-border/70 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+            <div>
+              <p className="text-xs font-bold text-foreground">
+                ¿Subiste cambios nuevos y no se ven en la PWA?
+              </p>
+              <p className="text-[11px] text-muted-foreground">
+                Limpia la caché del Service Worker y descarga la última versión (tus gastos, turnos y alertas NO se borran).
+              </p>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={isUpdatingPwa}
+              onClick={handleForceUpdatePwa}
+              className="text-xs gap-2 font-bold border-primary/40 hover:bg-primary/10 shrink-0"
+            >
+              <RotateCcw className={`h-3.5 w-3.5 text-primary ${isUpdatingPwa ? 'animate-spin' : ''}`} />
+              {isUpdatingPwa ? 'Actualizando...' : 'Actualizar PWA 🔄'}
+            </Button>
+          </div>
         </CardContent>
       </Card>
 
