@@ -1,0 +1,48 @@
+/* rotación + pulso (scale) para el exterior */
+@keyframes spinPulse {
+  0%   { transform: rotate(0deg) scale(1); }
+  50%  { transform: rotate(180deg) scale(1.12); }
+  100% { transform: rotate(360deg) scale(1); }
+}
+
+/* rotación + pulso inverso para el interior */
+@keyframes spinPulseReverse {
+  0%   { transform: rotate(0deg) scale(1); }
+  50%  { transform: rotate(-180deg) scale(0.95); }
+  100% { transform: rotate(-360deg) scale(1); }
+}
+
+/* cambia color de las partes visibles (top mantenido transparente) */
+@keyframes colorChange {
+  0% {
+    border-color: transparent #d946ef #d946ef #d946ef; /* top transparent, resto fucsia */
+  }
+  25% {
+    border-color: transparent #ec4899 #ec4899 #ec4899; /* rosa */
+  }
+  50% {
+    border-color: transparent #a855f7 #a855f7 #a855f7; /* violeta */
+  }
+  75% {
+    border-color: transparent #3b82f6 #3b82f6 #3b82f6; /* azul */
+  }
+  100% {
+    border-color: transparent #d946ef #d946ef #d946ef; /* vuelve a fucsia */
+  }
+}
+
+/* aplicar animaciones a los spinners */
+.spinner-outer {
+  /* el orden: primero el spin+pulse, luego el cambio de color */
+  animation: spinPulse 1.2s linear infinite, colorChange 3s ease-in-out infinite;
+  /* para que el "gap" superior se mantenga transparente (fallback) */
+  border-top-color: transparent;
+  box-shadow: 0 0 12px rgba(0,0,0,0.25);
+}
+
+/* el interior gira en sentido opuesto */
+.spinner-inner {
+  animation: spinPulseReverse 1.2s linear infinite, colorChange 3s ease-in-out infinite;
+  border-top-color: transparent;
+  box-shadow: 0 0 8px rgba(0,0,0,0.2);
+}

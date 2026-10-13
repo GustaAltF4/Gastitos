@@ -1,64 +1,107 @@
 import { useState, useEffect, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Transaction, Reminder, TransactionScope, DEFAULT_CATEGORIES } from './types/finance'
-import { storageService, UserConfig, RADIUS_VALUES } from './services/storage'
-import { notificationService } from './services/notifications'
-import { Header } from './components/Header'
-import { BalanceCard, AccountSummary } from './components/BalanceCard'
-import { FinanceDashboard } from './components/FinanceDashboard'
-import { TransactionList } from './components/TransactionList'
-import { TransactionModal } from './components/TransactionModal'
-import { ReminderList } from './components/ReminderList'
-import { ReminderModal } from './components/ReminderModal'
-import { SettingsTab } from './components/SettingsTab'
-import { generatePdfReport } from './services/pdfReport'
 import {
-  LayoutDashboard,
-  Receipt,
-  Bell,
+  Truck,
+  RotateCw,
+  Newspaper,
+  Save,
+  FileDown,
+  Trash2,
   Plus,
+  Receipt,
   Settings,
-  ChevronLeft,
-  ChevronRight,
-  PawPrint,
-  Calendar,
+  BarChart3,
+  CirclePlus,
+  Search,
+  Lock,
 } from 'lucide-react'
+import { TripMenu } from './components/TripMenu'
+import { AddGastoModal } from './components/AddGastoModal'
+import { TripSettingsTab } from './components/TripSettingsTab'
+import { FinanceDashboard } from './components/FinanceDashboard'
+import { GlowCard } from './components/react-bits/GlowCard'
+import { Card, CardContent, CardHeader, CardTitle } from './components/ui/card'
+import { Input } from './components/ui/input'
+import { Button } from './components/ui/button'
+import { RADIUS_VALUES } from './services/storage'
+import {
+  tripStorage,
+  TripState,
+  GastoViaje,
+  TipoPlata,
+  DEFAULT_TRUCK_CATEGORIES,
+} from './services/tripStorage'
+import { exportTripPDF } from './services/tripPdf'
+import { Transaction } from './types/finance'
+import { getLocalDateString } from './lib/utils'
+
+function FlagArgentina() {
+  return (
+    <svg
+      viewBox="0 0 36 24"
+      className="w-10 h-7 rounded-md shadow-xs shrink-0 border border-black/15"
+      aria-label="Argentina"
+    >
+      <rect width="36" height="24" fill="#74ACDF" />
+      <rect y="8" width="36" height="8" fill="#FFFFFF" />
+      <circle cx="18" cy="12" r="2.6" fill="#F6B40E" stroke="#85340A" strokeWidth="0.4" />
+    </svg>
+  )
+}
+
+function FlagChile() {
+  return (
+    <svg
+      viewBox="0 0 36 24"
+      className="w-10 h-7 rounded-md shadow-xs shrink-0 border border-black/15"
+      aria-label="Chile"
+    >
+      <rect width="36" height="12" fill="#FFFFFF" />
+      <rect y="12" width="36" height="12" fill="#D52B1E" />
+      <rect width="12" height="12" fill="#0039A6" />
+      <polygon
+        points="6,2.5 7,5.2 9.8,5.2 7.5,6.8 8.4,9.5 6,7.9 3.6,9.5 4.5,6.8 2.2,5.2 5,5.2"
+        fill="#FFFFFF"
+      />
+    </svg>
+  )
+}
+
+function formatMoney(value: number): string {
+  if (!Number.isFinite(value)) return '0'
+  return value.toLocaleString('es-AR', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  })
+}
 
 export function App() {
-  const [transactions, setTransactions] = useState<Transaction[]>([])
-  const [reminders, setReminders] = useState<Reminder[]>([])
-  const [config, setConfig] = useState<UserConfig>({
-    currency: 'ARS',
-    userName: 'Cuentas Vivi y Papá',
-    account1Name: 'Vivi',
-    account2Name: 'Papá',
-    account1Emoji: '👩',
-    account2Emoji: '👨',
-    darkMode: false,
-    themeColor: 'emerald',
-    borderRadius: 'md',
-    monthlyBudget: 0,
-    savingsGoal: 0,
-    notificationSound: true,
-    categories: DEFAULT_CATEGORIES,
+  const [tripState, setTripState] = useState<TripState>({
+    plataArgentina: 0,
+    plataChilena: 0,
+    plataArgentinaInicial: 0,
+    plataChilenaInicial: 0,
+    nombre: '',
+    destino: '',
+    guardado: false,
+    gastos: [],
+    darkMode: true,
+    themeColor: 'indigo',
+    borderRadius: 'lg',
+    categories: DEFAULT_TRUCK_CATEGORIES,
   })
 
-  // Por defecto inicia en modo 'continuous' para que nunca se reinicie cada mes y se guarde todo continuamente
-  const [viewMode, setViewMode] = useState<'continuous' | 'monthly'>('continuous')
-  const [currentMonth, setCurrentMonth] = useState<Date>(new Date())
-  const [scopeFilter, setScopeFilter] = useState<TransactionScope | 'all'>('all')
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'transactions' | 'reminders' | 'settings'>('dashboard')
+  const [inputArs, setInputArs] = useState('')
+  const [inputClp, setInputClp] = useState('')
+  const [loaded, setLoaded] = useState(false)
 
-  const [isTxModalOpen, setIsTxModalOpen] = useState(false)
-  const [isReminderModalOpen, setIsReminderModalOpen] = useState(false)
-
-  const account1Name = config.account1Name?.trim() || 'Vivi'
-  const account2Name = config.account2Name?.trim() || 'Papá'
-  const account1Emoji = config.account1Emoji?.trim() || '👩'
-  const account2Emoji = config.account2Emoji?.trim() || '👨'
+  const [activeTab, setActiveTab] = useState<'trip' | 'gastos' | 'charts' | 'settings'>('trip')
+  const [monedaFilter, setMonedaFilter] = useState<'all' | TipoPlata>('all')
+  const [searchTerm, setSearchTerm] = useState('')
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false)
 
   // Aplicar clases de tema, modo oscuro y redondeo de bordes (--radius)
-  const applyThemeClasses = (dark: boolean, theme: string, radius: string = 'md') => {
+  const applyThemeClasses = (dark: boolean, theme: string, radius: string = 'lg') => {
     const root = document.documentElement
     if (dark) {
       root.classList.add('dark')
@@ -76,272 +119,269 @@ export function App() {
       'theme-neutral',
     ]
     allThemes.forEach((t) => root.classList.remove(t))
-    root.classList.add(`theme-${theme || 'emerald'}`)
+    root.classList.add(`theme-${theme || 'indigo'}`)
 
-    const radiusPx = RADIUS_VALUES[radius as keyof typeof RADIUS_VALUES] || '12px'
+    const radiusPx = RADIUS_VALUES[radius as keyof typeof RADIUS_VALUES] || '18px'
     root.style.setProperty('--radius', radiusPx)
   }
 
-  // Carga inicial de datos
   useEffect(() => {
-    async function loadData() {
-      const [txs, rems, cfg] = await Promise.all([
-        storageService.getTransactions(),
-        storageService.getReminders(),
-        storageService.getConfig(),
-      ])
-      setTransactions(txs)
-      setReminders(rems)
-      setConfig(cfg)
-      applyThemeClasses(cfg.darkMode, cfg.themeColor, cfg.borderRadius)
+    async function init() {
+      const saved = await tripStorage.loadState()
+      setTripState(saved)
+      setInputArs(saved.guardado ? String(saved.plataArgentina) : '')
+      setInputClp(saved.guardado ? String(saved.plataChilena) : '')
+      applyThemeClasses(saved.darkMode, saved.themeColor, saved.borderRadius)
+      setLoaded(true)
     }
-    loadData()
+    init()
   }, [])
 
-  // Actualizar configuración
-  const handleUpdateConfig = async (partial: Partial<UserConfig>) => {
-    const updated = { ...config, ...partial }
-    setConfig(updated)
-    applyThemeClasses(updated.darkMode, updated.themeColor, updated.borderRadius)
-    await storageService.saveConfig(updated)
+  const updateAndPersist = async (next: TripState) => {
+    setTripState(next)
+    applyThemeClasses(next.darkMode, next.themeColor, next.borderRadius)
+    await tripStorage.saveState(next)
   }
 
-  // Restablecer todos los datos a cero
-  const handleClearAll = async () => {
-    if (
-      !confirm(
-        '¿Estás seguro de que deseas restablecer TODOS los movimientos y recordatorios a cero? Esta acción no se puede deshacer.'
-      )
-    ) {
+  const handleUpdatePartial = async (partial: Partial<TripState>) => {
+    const next = { ...tripState, ...partial }
+    await updateAndPersist(next)
+  }
+
+  const handleToggleDarkMode = () => {
+    handleUpdatePartial({ darkMode: !tripState.darkMode })
+  }
+
+  const isInitialFormValid =
+    inputArs.trim() !== '' &&
+    inputClp.trim() !== '' &&
+    tripState.destino.trim() !== ''
+
+  const guardarInicioViaje = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!isInitialFormValid) {
+      alert('Por favor completa la Plata Inicial Argentina, Plata Inicial Chilena y el Destino del viaje.')
       return
     }
-    await storageService.clearAllData()
-    setTransactions([])
-    setReminders([])
-    alert('Todos tus movimientos y recordatorios han sido eliminados. La app quedó 100% en blanco.')
-  }
 
-  // Guardar transacciones
-  const handleAddTransaction = async (txData: Omit<Transaction, 'id' | 'createdAt'>) => {
-    const newTx: Transaction = {
-      ...txData,
-      id: `tx-${Date.now()}`,
-      createdAt: new Date().toISOString(),
+    const arsNum = parseFloat(inputArs) || 0
+    const clpNum = parseFloat(inputClp) || 0
+
+    const next: TripState = {
+      ...tripState,
+      plataArgentina: arsNum,
+      plataChilena: clpNum,
+      plataArgentinaInicial: arsNum,
+      plataChilenaInicial: clpNum,
+      destino: tripState.destino.trim(),
+      guardado: true,
     }
-    const updated = [newTx, ...transactions]
-    setTransactions(updated)
-    await storageService.saveTransactions(updated)
+    await updateAndPersist(next)
   }
 
   const handleAddCategory = (newCat: string) => {
-    const current = config.categories || DEFAULT_CATEGORIES
+    const current = tripState.categories || DEFAULT_TRUCK_CATEGORIES
     if (!current.includes(newCat)) {
-      handleUpdateConfig({ categories: [...current, newCat] })
+      handleUpdatePartial({ categories: [...current, newCat] })
     }
   }
 
-  const handleDeleteTransaction = async (id: string) => {
-    if (!confirm('¿Eliminar este movimiento?')) return
-    const updated = transactions.filter((t) => t.id !== id)
-    setTransactions(updated)
-    await storageService.saveTransactions(updated)
-  }
+  const handleAddGasto = async ({
+    monto,
+    tipoGasto,
+    descripcion,
+    tipoPlata,
+    dias,
+  }: {
+    monto: number
+    tipoGasto: string
+    descripcion?: string
+    tipoPlata: TipoPlata
+    dias?: number
+  }) => {
+    if (!tripState.guardado) return
 
-  // Guardar recordatorios
-  const handleAddReminder = async (
-    remData: Omit<Reminder, 'id' | 'notificationId' | 'status' | 'createdAt'>
-  ) => {
-    const notificationId = Math.floor(Math.random() * 100000)
-    const newReminder: Reminder = {
-      ...remData,
-      id: `rem-${Date.now()}`,
-      notificationId,
-      status: 'pending',
-      createdAt: new Date().toISOString(),
+    let nuevaArs = tripState.plataArgentina
+    let nuevaClp = tripState.plataChilena
+    let totalRestante = 0
+
+    if (tipoPlata === 'Plata Argentina') {
+      nuevaArs = tripState.plataArgentina - monto
+      totalRestante = nuevaArs
+    } else {
+      nuevaClp = tripState.plataChilena - monto
+      totalRestante = nuevaClp
     }
 
-    // Programar alerta en Capacitor
-    await notificationService.scheduleReminderNotification(newReminder, config.currency)
-
-    const updated = [newReminder, ...reminders]
-    setReminders(updated)
-    await storageService.saveReminders(updated)
-  }
-
-  const handleCompleteReminder = async (id: string) => {
-    const target = reminders.find((r) => r.id === id)
-    if (!target) return
-
-    const newStatus = target.status === 'completed' ? 'pending' : 'completed'
-    if (newStatus === 'completed' && target.notificationId) {
-      await notificationService.cancelNotification(target.notificationId)
+    const nuevoGasto: GastoViaje = {
+      id: `gasto-${Date.now()}`,
+      fecha: new Date().toLocaleDateString('es-AR'),
+      tipoGasto,
+      descripcion,
+      monto,
+      tipoPlata,
+      dias,
+      totalRestante,
     }
 
-    const updated = reminders.map((r) =>
-      r.id === id ? { ...r, status: newStatus as any } : r
-    )
-    setReminders(updated)
-    await storageService.saveReminders(updated)
-  }
-
-  const handleDeleteReminder = async (id: string) => {
-    const target = reminders.find((r) => r.id === id)
-    if (!target) return
-    if (!confirm('¿Eliminar este recordatorio?')) return
-
-    if (target.notificationId) {
-      await notificationService.cancelNotification(target.notificationId)
+    const next: TripState = {
+      ...tripState,
+      plataArgentina: nuevaArs,
+      plataChilena: nuevaClp,
+      gastos: [...tripState.gastos, nuevoGasto],
     }
-    const updated = reminders.filter((r) => r.id !== id)
-    setReminders(updated)
-    await storageService.saveReminders(updated)
+
+    await updateAndPersist(next)
   }
 
-  // Probar notificación
-  const handleTestNotification = async () => {
-    await notificationService.triggerTestNotification()
-  }
+  const eliminarGasto = async (idOrIndex: string | number) => {
+    const confirmado = window.confirm('¿Estás seguro que querés eliminar este gasto?')
+    if (!confirmado) return
 
-  // Dark mode toggle
-  const handleToggleDarkMode = async () => {
-    await handleUpdateConfig({ darkMode: !config.darkMode })
-  }
+    const index =
+      typeof idOrIndex === 'number'
+        ? idOrIndex
+        : tripState.gastos.findIndex((g) => g.id === idOrIndex)
+    const gasto = tripState.gastos[index]
+    if (!gasto) return
 
-  // Navegación de meses
-  const handlePrevMonth = () => {
-    setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1))
-  }
-  const handleNextMonth = () => {
-    setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1))
-  }
+    let nuevaArs = tripState.plataArgentina
+    let nuevaClp = tripState.plataChilena
 
-  // Cálculo de resúmenes por cada una de las 2 cuentas y totales con arrastre continuo
-  const {
-    displayedTransactions,
-    allPeriodTransactions,
-    allScopeTransactions,
-    account1Summary,
-    account2Summary,
-    totalIncome,
-    totalExpense,
-    balance,
-    carryOverBalance,
-  } = useMemo(() => {
-    const targetYear = currentMonth.getFullYear()
-    const targetMonth = currentMonth.getMonth()
+    if (gasto.tipoPlata === 'Plata Argentina') {
+      nuevaArs += gasto.monto
+    } else if (gasto.tipoPlata === 'Plata Chilena') {
+      nuevaClp += gasto.monto
+    }
 
-    const acc1: AccountSummary = { income: 0, expense: 0, balance: 0, carryOver: 0 }
-    const acc2: AccountSummary = { income: 0, expense: 0, balance: 0, carryOver: 0 }
+    const nuevosGastos = tripState.gastos.filter((_, i) => i !== index)
 
-    const filteredForPeriodAndScope: Transaction[] = []
-    const filteredForPeriodAllAccounts: Transaction[] = []
-    const filteredForScopeOnly: Transaction[] = []
-
-    // Ordenar de más reciente a más antiguo para la lista
-    const sortedTxs = [...transactions].sort((a, b) => b.date.localeCompare(a.date))
-
-    sortedTxs.forEach((tx) => {
-      const [year, month] = tx.date.split('-').map(Number)
-      const txMonthIndex = month - 1
-      const isAcc2 = tx.scope === 'business'
-      const targetAcc = isAcc2 ? acc2 : acc1
-
-      const matchesScope = scopeFilter === 'all' || tx.scope === scopeFilter
-      if (matchesScope) {
-        filteredForScopeOnly.push(tx)
-      }
-
-      if (viewMode === 'continuous') {
-        // Modo continuo: nunca se reinicia cada mes, suma todo el historial
-        if (tx.type === 'income') {
-          targetAcc.income += tx.amount
-          targetAcc.balance += tx.amount
-        } else {
-          targetAcc.expense += tx.amount
-          targetAcc.balance -= tx.amount
-        }
-        filteredForPeriodAllAccounts.push(tx)
-        if (matchesScope) {
-          filteredForPeriodAndScope.push(tx)
-        }
+    let runningArs = tripState.plataArgentinaInicial
+    let runningClp = tripState.plataChilenaInicial
+    const gastosRecalculados = nuevosGastos.map((g) => {
+      if (g.tipoPlata === 'Plata Argentina') {
+        runningArs -= g.monto
+        return { ...g, totalRestante: runningArs }
       } else {
-        // Modo mensual con arrastre: lo anterior al mes seleccionado se guarda como saldo arrastrado (carryOver)
-        const isBeforeMonth =
-          year < targetYear || (year === targetYear && txMonthIndex < targetMonth)
-        const isCurrentMonth = year === targetYear && txMonthIndex === targetMonth
-
-        if (isBeforeMonth) {
-          if (tx.type === 'income') {
-            targetAcc.carryOver += tx.amount
-            targetAcc.balance += tx.amount
-          } else {
-            targetAcc.carryOver -= tx.amount
-            targetAcc.balance -= tx.amount
-          }
-        } else if (isCurrentMonth) {
-          if (tx.type === 'income') {
-            targetAcc.income += tx.amount
-            targetAcc.balance += tx.amount
-          } else {
-            targetAcc.expense += tx.amount
-            targetAcc.balance -= tx.amount
-          }
-          filteredForPeriodAllAccounts.push(tx)
-          if (matchesScope) {
-            filteredForPeriodAndScope.push(tx)
-          }
-        }
+        runningClp -= g.monto
+        return { ...g, totalRestante: runningClp }
       }
     })
 
-    const activeSummary =
-      scopeFilter === 'personal'
-        ? acc1
-        : scopeFilter === 'business'
-        ? acc2
-        : {
-            income: acc1.income + acc2.income,
-            expense: acc1.expense + acc2.expense,
-            balance: acc1.balance + acc2.balance,
-            carryOver: acc1.carryOver + acc2.carryOver,
-          }
-
-    return {
-      displayedTransactions: filteredForPeriodAndScope,
-      allPeriodTransactions: filteredForPeriodAllAccounts,
-      allScopeTransactions: filteredForScopeOnly,
-      account1Summary: acc1,
-      account2Summary: acc2,
-      totalIncome: activeSummary.income,
-      totalExpense: activeSummary.expense,
-      balance: activeSummary.balance,
-      carryOverBalance: activeSummary.carryOver,
+    const next: TripState = {
+      ...tripState,
+      plataArgentina: nuevaArs,
+      plataChilena: nuevaClp,
+      gastos: gastosRecalculados,
     }
-  }, [transactions, currentMonth, scopeFilter, viewMode])
 
-  // Descargar / Compartir informe profesional en PDF
-  const handleDownloadPdf = async () => {
-    await generatePdfReport(transactions, config, 'Informe Financiero Acumulado (2 Cuentas)')
+    await updateAndPersist(next)
   }
 
-  const pendingRemindersCount = reminders.filter((r) => r.status === 'pending').length
+  const resetViaje = async () => {
+    const confirmado = window.confirm(
+      '¿Estás seguro que querés reiniciar todo? Esto borrará la plata y los gastos para empezar un viaje nuevo.'
+    )
+    if (!confirmado) return
+
+    const fresh = await tripStorage.resetTrip(tripState)
+    setTripState(fresh)
+    setInputArs('')
+    setInputClp('')
+    setActiveTab('trip')
+  }
+
+  // Gastos filtrados para la vista de lista/tabla
+  const filteredGastos = useMemo(() => {
+    return tripState.gastos
+      .map((g, originalIndex) => ({ ...g, originalIndex }))
+      .filter((g) => {
+        const matchesMoneda = monedaFilter === 'all' || g.tipoPlata === monedaFilter
+        const matchesSearch =
+          !searchTerm.trim() ||
+          g.tipoGasto.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          (g.descripcion && g.descripcion.toLowerCase().includes(searchTerm.toLowerCase())) ||
+          g.fecha.toLowerCase().includes(searchTerm.toLowerCase())
+        return matchesMoneda && matchesSearch
+      })
+  }, [tripState.gastos, monedaFilter, searchTerm])
+
+  // Adaptador para los gráficos (enfocado en Gastos del viaje y saldos restantes)
+  const { dashboardTransactions, arsSummary, clpSummary } = useMemo(() => {
+    const todayIso = getLocalDateString()
+    const txs: Transaction[] = []
+
+    let arsGastado = 0
+    let clpGastado = 0
+
+    tripState.gastos.forEach((g, idx) => {
+      const isClp = g.tipoPlata === 'Plata Chilena'
+      if (isClp) clpGastado += g.monto
+      else arsGastado += g.monto
+
+      txs.push({
+        id: g.id || `g-${idx}`,
+        type: 'expense',
+        amount: g.monto,
+        category: g.tipoGasto,
+        scope: isClp ? 'business' : 'personal',
+        date: todayIso,
+        description: g.descripcion || g.tipoGasto,
+        createdAt: todayIso,
+      })
+    })
+
+    return {
+      dashboardTransactions: txs,
+      arsSummary: {
+        income: tripState.plataArgentinaInicial,
+        expense: arsGastado,
+        balance: tripState.plataArgentina,
+        carryOver: 0,
+      },
+      clpSummary: {
+        income: tripState.plataChilenaInicial,
+        expense: clpGastado,
+        balance: tripState.plataChilena,
+        carryOver: 0,
+      },
+    }
+  }, [tripState])
+
+  if (!loaded) {
+    return <div className="min-h-screen bg-background text-foreground" />
+  }
+
+  const {
+    plataArgentina,
+    plataChilena,
+    plataArgentinaInicial,
+    plataChilenaInicial,
+    nombre,
+    destino,
+    guardado,
+    gastos,
+    darkMode,
+  } = tripState
 
   return (
     <div
       className="min-h-screen bg-background text-foreground flex flex-col sm:pb-32"
       style={{
-        paddingBottom: 'calc(6.5rem + max(env(safe-area-inset-bottom, 0px), var(--safe-area-inset-bottom, 0px)))',
+        paddingBottom:
+          'calc(6.5rem + max(env(safe-area-inset-bottom, 0px), var(--safe-area-inset-bottom, 0px)))',
       }}
     >
-      {/* Barra superior limpia */}
-      <Header
-        darkMode={config.darkMode}
+      {/* Cabecera Superior Limpia */}
+      <TripMenu
+        darkMode={darkMode}
         onToggleDarkMode={handleToggleDarkMode}
-        userName={config.userName}
+        nombre={nombre}
+        destino={destino}
       />
 
-      {/* Contenido principal con transición fluida GPU */}
-      <main className="container max-w-5xl mx-auto px-4 py-5 flex-1 space-y-6">
+      {/* Contenido Principal con Transiciones Fluidas */}
+      <main className="container max-w-4xl mx-auto px-4 py-5 flex-1 space-y-6">
         <AnimatePresence mode="wait">
           <motion.div
             key={activeTab}
@@ -351,197 +391,492 @@ export function App() {
             transition={{ duration: 0.15, ease: 'easeOut' }}
             className="hardware-accelerated space-y-6"
           >
-            {/* Tab 1: Tablero y Balance de las 2 Cuentas */}
-            {activeTab === 'dashboard' && (
-              <div className="space-y-6">
-                <BalanceCard
-                  viewMode={viewMode}
-                  onViewModeChange={setViewMode}
-                  currentMonth={currentMonth}
-                  onPrevMonth={handlePrevMonth}
-                  onNextMonth={handleNextMonth}
-                  totalIncome={totalIncome}
-                  totalExpense={totalExpense}
-                  balance={balance}
-                  carryOverBalance={carryOverBalance}
-                  account1Name={account1Name}
-                  account2Name={account2Name}
-                  account1Emoji={account1Emoji}
-                  account2Emoji={account2Emoji}
-                  account1Summary={account1Summary}
-                  account2Summary={account2Summary}
-                  scopeFilter={scopeFilter}
-                  onScopeChange={setScopeFilter}
-                  currency={config.currency}
-                />
+            {/* PESTAÑA 1: VIAJE PRINCIPAL */}
+            {activeTab === 'trip' && (
+              <div className="space-y-5 max-w-xl mx-auto">
+                {/* Tarjeta Principal de Saldos ARS y CLP con GlowCard */}
+                <GlowCard
+                  glowColor={
+                    plataArgentina >= 0 && plataChilena >= 0
+                      ? 'hsl(var(--primary) / 0.28)'
+                      : 'rgba(239, 68, 68, 0.25)'
+                  }
+                  className="bg-gradient-to-br from-card via-card to-muted/30 border border-border/80"
+                >
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-2.5">
+                      <div className="p-2 rounded-[var(--radius)] bg-primary/15 text-primary">
+                        <Truck className="h-6 w-6" />
+                      </div>
+                      <div>
+                        <h2 className="text-lg sm:text-xl font-extrabold text-foreground leading-tight">
+                          {guardado && destino ? `Viaje a ${destino}` : 'Plata Disponible'}
+                        </h2>
+                        <p className="text-xs text-muted-foreground">
+                          {guardado
+                            ? `${gastos.length} gasto${gastos.length === 1 ? '' : 's'} registrado${
+                                gastos.length === 1 ? '' : 's'
+                              }`
+                            : 'Completa el formulario de abajo para empezar'}
+                        </p>
+                      </div>
+                    </div>
 
-                <FinanceDashboard
-                  transactions={displayedTransactions}
-                  allPeriodTransactions={allPeriodTransactions}
-                  allTransactions={allScopeTransactions}
-                  currency={config.currency}
-                  themeColor={config.themeColor}
-                  account1Name={account1Name}
-                  account2Name={account2Name}
-                  account1Emoji={account1Emoji}
-                  account2Emoji={account2Emoji}
-                  account1Summary={account1Summary}
-                  account2Summary={account2Summary}
-                />
+                    {guardado && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => exportTripPDF(tripState)}
+                        className="rounded-[var(--radius)] border-primary/40 text-primary font-bold gap-1.5"
+                      >
+                        <FileDown className="h-4 w-4" />
+                        PDF
+                      </Button>
+                    )}
+                  </div>
+
+                  {/* Saldo Argentina (ARS) */}
+                  <div className="p-4 rounded-[var(--radius)] bg-background/80 dark:bg-muted/30 border border-border/80 flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      <FlagArgentina />
+                      <div>
+                        <span className="text-lg sm:text-xl font-extrabold text-foreground block leading-tight">
+                          ARS (Argentina)
+                        </span>
+                        {guardado && (
+                          <span className="text-xs text-muted-foreground">
+                            Inicial: ${formatMoney(plataArgentinaInicial)} • Gastado: $
+                            {formatMoney(arsSummary.expense)}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <span
+                      className={`text-2xl sm:text-3xl font-black tracking-tight ${
+                        plataArgentina < 0
+                          ? 'text-red-500'
+                          : 'text-emerald-600 dark:text-emerald-400'
+                      }`}
+                    >
+                      ${formatMoney(plataArgentina)}
+                    </span>
+                  </div>
+
+                  {/* Saldo Chile (CLP) */}
+                  <div className="mt-3 p-4 rounded-[var(--radius)] bg-background/80 dark:bg-muted/30 border border-border/80 flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      <FlagChile />
+                      <div>
+                        <span className="text-lg sm:text-xl font-extrabold text-foreground block leading-tight">
+                          CLP (Chilena)
+                        </span>
+                        {guardado && (
+                          <span className="text-xs text-muted-foreground">
+                            Inicial: ${formatMoney(plataChilenaInicial)} • Gastado: $
+                            {formatMoney(clpSummary.expense)}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <span
+                      className={`text-2xl sm:text-3xl font-black tracking-tight ${
+                        plataChilena < 0
+                          ? 'text-red-500'
+                          : 'text-emerald-600 dark:text-emerald-400'
+                      }`}
+                    >
+                      ${formatMoney(plataChilena)}
+                    </span>
+                  </div>
+                </GlowCard>
+
+                {/* ESTADO 1: FORMULARIO INICIAL OBLIGATORIO (!guardado) */}
+                {!guardado && (
+                  <Card className="border-border/80 shadow-md">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-xl font-bold text-center">
+                        Iniciar Nuevo Viaje
+                      </CardTitle>
+                      <p className="text-sm text-muted-foreground text-center">
+                        Ingresa la plata inicial en pesos argentinos y chilenos y el destino del viaje para habilitar la carga de gastos.
+                      </p>
+                    </CardHeader>
+                    <CardContent>
+                      <form onSubmit={guardarInicioViaje} className="space-y-4">
+                        <div>
+                          <label className="text-base font-bold text-foreground block mb-1.5">
+                            🇦🇷 Plata Inicial Argentina (ARS)
+                          </label>
+                          <Input
+                            type="number"
+                            inputMode="decimal"
+                            required
+                            placeholder="Ej: 150000"
+                            className="w-full h-14 !text-2xl font-extrabold rounded-[var(--radius)] px-4"
+                            value={inputArs}
+                            onChange={(e) => {
+                              const val = e.target.value
+                              setInputArs(val)
+                              setTripState((prev) => ({
+                                ...prev,
+                                plataArgentina: parseFloat(val) || 0,
+                              }))
+                            }}
+                          />
+                        </div>
+
+                        <div>
+                          <label className="text-base font-bold text-foreground block mb-1.5">
+                            🇨🇱 Plata Inicial Chilena (CLP)
+                          </label>
+                          <Input
+                            type="number"
+                            inputMode="decimal"
+                            required
+                            placeholder="Ej: 200000"
+                            className="w-full h-14 !text-2xl font-extrabold rounded-[var(--radius)] px-4"
+                            value={inputClp}
+                            onChange={(e) => {
+                              const val = e.target.value
+                              setInputClp(val)
+                              setTripState((prev) => ({
+                                ...prev,
+                                plataChilena: parseFloat(val) || 0,
+                              }))
+                            }}
+                          />
+                        </div>
+
+                        <div>
+                          <label className="text-base font-bold text-foreground block mb-1.5">
+                            📍 Destino del viaje
+                          </label>
+                          <Input
+                            type="text"
+                            required
+                            placeholder="Ej: Santiago de Chile"
+                            className="w-full h-14 !text-2xl font-bold rounded-[var(--radius)] px-4"
+                            value={destino}
+                            onChange={(e) =>
+                              setTripState((prev) => ({ ...prev, destino: e.target.value }))
+                            }
+                          />
+                        </div>
+
+                        <Button
+                          type="submit"
+                          disabled={!isInitialFormValid}
+                          className="w-full py-7 text-2xl font-extrabold bg-primary hover:bg-primary/90 text-primary-foreground rounded-[var(--radius)] flex items-center justify-center gap-3 shadow-lg shadow-primary/25 mt-2 disabled:opacity-40"
+                        >
+                          <Save className="w-7 h-7" />
+                          Guardar
+                        </Button>
+                      </form>
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* ESTADO 2: VIAJE EN CURSO (guardado === true) */}
+                {guardado && (
+                  <div className="space-y-4">
+                    {/* Botón Gigante Agregar Gasto */}
+                    <Button
+                      type="button"
+                      onClick={() => setIsAddModalOpen(true)}
+                      className="w-full py-8 text-2xl sm:text-3xl font-extrabold bg-primary hover:bg-primary/90 text-primary-foreground rounded-[var(--radius)] flex items-center justify-center gap-3 shadow-lg shadow-primary/30 active:scale-[0.98]"
+                    >
+                      <CirclePlus className="w-9 h-9 shrink-0" />
+                      Agregar Gasto
+                    </Button>
+
+                    {/* Botón Reiniciar Viaje */}
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={resetViaje}
+                      className="w-full py-6 text-xl sm:text-2xl font-bold rounded-[var(--radius)] border-2 flex items-center justify-center gap-2.5"
+                    >
+                      <RotateCw className="w-6 h-6" />
+                      Reiniciar Viaje
+                    </Button>
+
+                    {/* Lista rápida de Gastos Registrados + Exportar PDF */}
+                    <Card className="mt-4">
+                      <CardHeader className="pb-3">
+                        <div className="flex items-center justify-between gap-2 flex-wrap">
+                          <CardTitle className="text-lg sm:text-xl font-extrabold flex items-center gap-2">
+                            <Newspaper className="w-5 h-5 text-primary" />
+                            Gastos registrados ({gastos.length})
+                          </CardTitle>
+
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => exportTripPDF(tripState)}
+                            className="rounded-[var(--radius)] border-primary/40 bg-primary/10 text-primary font-bold gap-2"
+                          >
+                            <FileDown className="w-4 h-4" />
+                            Exportar PDF
+                          </Button>
+                        </div>
+                      </CardHeader>
+
+                      <CardContent>
+                        {gastos.length === 0 ? (
+                          <p className="text-center text-lg font-semibold text-muted-foreground py-6">
+                            No hay gastos todavía. Tocá "Agregar Gasto" o el botón + de abajo.
+                          </p>
+                        ) : (
+                          <div className="overflow-x-auto rounded-[var(--radius)] border border-border">
+                            <table className="w-full text-left border-collapse text-sm sm:text-base">
+                              <thead>
+                                <tr className="bg-muted/70 border-b border-border text-muted-foreground">
+                                  <th className="p-3 font-bold">Fecha</th>
+                                  <th className="p-3 font-bold">Tipo de Gasto</th>
+                                  <th className="p-3 font-bold">Monto</th>
+                                  <th className="p-3 font-bold">Tipo plata</th>
+                                  <th className="p-3 font-bold text-right">Acción</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-border">
+                                {gastos.map((g, i) => (
+                                  <tr key={g.id || i} className="hover:bg-muted/30">
+                                    <td className="p-3 whitespace-nowrap">{g.fecha}</td>
+                                    <td className="p-3 font-bold">
+                                      <div>{g.tipoGasto}</div>
+                                      {g.descripcion && (
+                                        <div className="text-xs text-muted-foreground font-normal">
+                                          {g.descripcion}
+                                        </div>
+                                      )}
+                                      {g.dias && (
+                                        <div className="text-xs text-primary font-semibold">
+                                          {g.dias} día{g.dias > 1 ? 's' : ''}
+                                        </div>
+                                      )}
+                                    </td>
+                                    <td className="p-3 font-extrabold whitespace-nowrap text-rose-600 dark:text-rose-400">
+                                      ${formatMoney(g.monto)}
+                                    </td>
+                                    <td className="p-3 whitespace-nowrap font-medium">
+                                      {g.tipoPlata === 'Plata Argentina'
+                                        ? '🇦🇷 Argentina'
+                                        : '🇨🇱 Chilena'}
+                                    </td>
+                                    <td className="p-3 text-right">
+                                      <Button
+                                        type="button"
+                                        variant="destructive"
+                                        size="sm"
+                                        onClick={() => eliminarGasto(i)}
+                                        className="rounded-[calc(var(--radius)-4px)] font-bold"
+                                      >
+                                        <Trash2 className="w-4 h-4 sm:mr-1" />
+                                        <span className="hidden sm:inline">Eliminar</span>
+                                      </Button>
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  </div>
+                )}
               </div>
             )}
 
-            {/* Tab 2: Todos los Movimientos / Gastos */}
-            {activeTab === 'transactions' && (
-              <div className="space-y-4">
-                {/* Barra de filtro de Cuentas y Período */}
-                <div className="bg-card p-3 rounded-2xl border border-border shadow-xs space-y-2.5">
-                  {/* Selector rápido de Cuenta en la pestaña Gastos */}
-                  <div className="grid grid-cols-3 bg-muted/90 p-1 rounded-[calc(var(--radius)-2px)] text-xs gap-1 border border-border/60">
+            {/* PESTAÑA 2: GASTOS (Con filtro por moneda, buscador y exportar PDF) */}
+            {activeTab === 'gastos' && (
+              <div className="space-y-4 max-w-2xl mx-auto">
+                <div className="bg-card p-3.5 rounded-[var(--radius)] border border-border shadow-xs space-y-3">
+                  {/* Selector de Moneda */}
+                  <div className="grid grid-cols-3 bg-muted/90 p-1 rounded-[calc(var(--radius)-2px)] text-xs sm:text-sm gap-1 border border-border/60">
                     <button
                       type="button"
-                      onClick={() => setScopeFilter('all')}
-                      className={`py-2 px-2 rounded-[calc(var(--radius)-6px)] transition-all text-center leading-tight truncate active:scale-95 touch-manipulation select-none ${
-                        scopeFilter === 'all'
-                          ? 'bg-primary text-primary-foreground font-bold shadow-sm shadow-primary/30'
-                          : 'text-muted-foreground active:bg-primary/15 active:text-primary font-semibold'
+                      onClick={() => setMonedaFilter('all')}
+                      className={`py-2.5 px-2 rounded-[calc(var(--radius)-6px)] transition-all text-center font-bold active:scale-95 touch-manipulation select-none ${
+                        monedaFilter === 'all'
+                          ? 'bg-primary text-primary-foreground shadow-sm'
+                          : 'text-muted-foreground'
                       }`}
                     >
-                      Ambas
+                      Ambas ({gastos.length})
                     </button>
                     <button
                       type="button"
-                      onClick={() => setScopeFilter('personal')}
-                      className={`py-2 px-2 rounded-[calc(var(--radius)-6px)] transition-all text-center leading-tight flex items-center justify-center gap-1 min-w-0 active:scale-95 touch-manipulation select-none ${
-                        scopeFilter === 'personal'
-                          ? 'bg-primary text-primary-foreground font-bold shadow-sm shadow-primary/30'
-                          : 'text-muted-foreground active:bg-primary/15 active:text-primary font-semibold'
+                      onClick={() => setMonedaFilter('Plata Argentina')}
+                      className={`py-2.5 px-2 rounded-[calc(var(--radius)-6px)] transition-all text-center font-bold active:scale-95 touch-manipulation select-none ${
+                        monedaFilter === 'Plata Argentina'
+                          ? 'bg-primary text-primary-foreground shadow-sm'
+                          : 'text-muted-foreground'
                       }`}
                     >
-                      <span className="shrink-0">{account1Emoji}</span>
-                      <span className="truncate">{account1Name}</span>
+                      🇦🇷 Argentina
                     </button>
                     <button
                       type="button"
-                      onClick={() => setScopeFilter('business')}
-                      className={`py-2 px-2 rounded-[calc(var(--radius)-6px)] transition-all text-center leading-tight flex items-center justify-center gap-1 min-w-0 active:scale-95 touch-manipulation select-none ${
-                        scopeFilter === 'business'
-                          ? 'bg-primary text-primary-foreground font-bold shadow-sm shadow-primary/30'
-                          : 'text-muted-foreground active:bg-primary/15 active:text-primary font-semibold'
+                      onClick={() => setMonedaFilter('Plata Chilena')}
+                      className={`py-2.5 px-2 rounded-[calc(var(--radius)-6px)] transition-all text-center font-bold active:scale-95 touch-manipulation select-none ${
+                        monedaFilter === 'Plata Chilena'
+                          ? 'bg-primary text-primary-foreground shadow-sm'
+                          : 'text-muted-foreground'
                       }`}
                     >
-                      <span className="shrink-0">{account2Emoji}</span>
-                      <span className="truncate">{account2Name}</span>
+                      🇨🇱 Chilena
                     </button>
                   </div>
 
-                  {/* Filtro opcional por mes */}
-                  <div className="flex items-center justify-between text-xs px-0.5">
-                    <span className="text-muted-foreground font-medium">
-                      {viewMode === 'continuous'
-                        ? `${displayedTransactions.length} movimientos acumulados`
-                        : `${displayedTransactions.length} movimientos en este mes`}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => setViewMode(viewMode === 'continuous' ? 'monthly' : 'continuous')}
-                      className="px-2.5 py-1 rounded-full bg-primary/15 text-primary border border-primary/30 font-bold flex items-center gap-1 shadow-2xs active:scale-95 active:bg-primary active:text-primary-foreground transition-all touch-manipulation select-none"
-                    >
-                      <Calendar className="h-3.5 w-3.5" />
-                      {viewMode === 'continuous' ? 'Filtrar por mes' : 'Ver continuo'}
-                    </button>
-                  </div>
-
-                  {viewMode === 'monthly' && (
-                    <div className="flex items-center justify-between bg-muted/60 px-2.5 py-1.5 rounded-xl border border-primary/25 shadow-2xs">
-                      <button
-                        type="button"
-                        onClick={handlePrevMonth}
-                        className="p-1.5 bg-background/80 border border-border/60 rounded-lg text-foreground active:scale-90 active:bg-primary active:text-primary-foreground transition-all touch-manipulation"
-                        title="Mes anterior"
-                      >
-                        <ChevronLeft className="h-4 w-4" />
-                      </button>
-                      <span className="font-bold text-xs sm:text-sm capitalize text-foreground">
-                        {new Intl.DateTimeFormat("es-AR", { month: "long", year: "numeric" }).format(currentMonth)}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={handleNextMonth}
-                        className="p-1.5 bg-background/80 border border-border/60 rounded-lg text-foreground active:scale-90 active:bg-primary active:text-primary-foreground transition-all touch-manipulation"
-                        title="Mes siguiente"
-                      >
-                        <ChevronRight className="h-4 w-4" />
-                      </button>
+                  {/* Buscador + Botón PDF */}
+                  <div className="flex items-center gap-2">
+                    <div className="relative flex-1">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        placeholder="Buscar gasto por categoría, nota o fecha..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="pl-9 h-11 rounded-[var(--radius)]"
+                      />
                     </div>
-                  )}
+                    <Button
+                      type="button"
+                      disabled={!guardado}
+                      onClick={() => exportTripPDF(tripState)}
+                      className="h-11 px-4 rounded-[var(--radius)] font-bold gap-1.5 shrink-0 disabled:opacity-40"
+                    >
+                      <FileDown className="h-4 w-4" />
+                      Exportar PDF
+                    </Button>
+                  </div>
                 </div>
 
-                <TransactionList
-                  transactions={displayedTransactions}
-                  onDelete={handleDeleteTransaction}
-                  currency={config.currency}
-                  account1Name={account1Name}
-                  account2Name={account2Name}
-                  account1Emoji={account1Emoji}
-                  account2Emoji={account2Emoji}
-                />
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-base font-bold">
+                      Detalle de Gastos ({filteredGastos.length})
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="divide-y divide-border">
+                    {!guardado ? (
+                      <div className="py-10 text-center text-muted-foreground space-y-2">
+                        <Lock className="h-8 w-8 mx-auto text-muted-foreground/50" />
+                        <p className="font-semibold">
+                          Primero completa la plata inicial y el destino en la pestaña "Viaje".
+                        </p>
+                      </div>
+                    ) : filteredGastos.length === 0 ? (
+                      <div className="py-10 text-center text-muted-foreground">
+                        No hay gastos registrados con este filtro.
+                      </div>
+                    ) : (
+                      filteredGastos.map((g) => (
+                        <div
+                          key={g.id || g.originalIndex}
+                          className="py-3.5 flex items-center justify-between gap-3"
+                        >
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="font-bold text-base text-foreground">
+                                {g.tipoGasto}
+                              </span>
+                              <span className="text-xs px-2 py-0.5 rounded-full bg-muted font-semibold">
+                                {g.tipoPlata === 'Plata Argentina' ? '🇦🇷 ARS' : '🇨🇱 CLP'}
+                              </span>
+                              {g.dias && (
+                                <span className="text-xs px-2 py-0.5 rounded-full bg-primary/15 text-primary font-bold">
+                                  {g.dias} día{g.dias > 1 ? 's' : ''}
+                                </span>
+                              )}
+                            </div>
+                            {g.descripcion && (
+                              <p className="text-xs text-muted-foreground mt-0.5">
+                                {g.descripcion}
+                              </p>
+                            )}
+                            <p className="text-xs text-muted-foreground mt-0.5">
+                              {g.fecha} • Quedaban: ${formatMoney(g.totalRestante)}
+                            </p>
+                          </div>
+
+                          <div className="flex items-center gap-2.5 shrink-0">
+                            <span className="font-extrabold text-base sm:text-lg text-rose-600 dark:text-rose-400">
+                              -${formatMoney(g.monto)}
+                            </span>
+                            <Button
+                              type="button"
+                              variant="destructive"
+                              size="sm"
+                              onClick={() => eliminarGasto(g.originalIndex)}
+                              className="h-9 w-9 p-0 rounded-[calc(var(--radius)-4px)]"
+                              title="Eliminar gasto"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </CardContent>
+                </Card>
               </div>
             )}
 
-            {/* Tab 3: Recordatorios */}
-            {activeTab === 'reminders' && (
-              <div className="space-y-4">
-                <ReminderList
-                  reminders={reminders}
-                  onComplete={handleCompleteReminder}
-                  onDelete={handleDeleteReminder}
-                  onTestNotification={handleTestNotification}
-                  onCreateNew={() => setIsReminderModalOpen(true)}
-                  currency={config.currency}
-                  account1Name={account1Name}
-                  account2Name={account2Name}
-                  account1Emoji={account1Emoji}
-                  account2Emoji={account2Emoji}
-                />
-              </div>
+            {/* PESTAÑA 3: GRÁFICOS Y ESTADÍSTICAS DE GASTOS DEL VIAJE */}
+            {activeTab === 'charts' && (
+              <FinanceDashboard
+                transactions={dashboardTransactions}
+                allPeriodTransactions={dashboardTransactions}
+                allTransactions={dashboardTransactions}
+                currency="ARS"
+                themeColor={tripState.themeColor}
+                account1Name="Plata Argentina (ARS)"
+                account2Name="Plata Chilena (CLP)"
+                account1Emoji="🇦🇷"
+                account2Emoji="🇨🇱"
+                account1Summary={arsSummary}
+                account2Summary={clpSummary}
+              />
             )}
 
-            {/* Tab 4: Configuración & Personalización */}
+            {/* PESTAÑA 4: AJUSTES (Nombre del Chofer, Colores, Bordes, Categorías Personalizables) */}
             {activeTab === 'settings' && (
-              <SettingsTab
-                config={config}
-                onUpdateConfig={handleUpdateConfig}
-                onDownloadPdf={handleDownloadPdf}
-                onClearAll={handleClearAll}
-                onTestNotification={handleTestNotification}
+              <TripSettingsTab
+                tripState={tripState}
+                onUpdateState={handleUpdatePartial}
+                onExportPdf={() => exportTripPDF(tripState)}
+                onResetTrip={resetViaje}
               />
             )}
           </motion.div>
         </AnimatePresence>
       </main>
 
-      {/* Barra de Navegación Inferior Unificada (Móvil y Escritorio) */}
+      {/* Barra de Navegación Inferior Unificada con Botón Central [+] (Bloqueado hasta guardar viaje inicial) */}
       <nav className="fixed bottom-0 inset-x-0 bg-background/95 backdrop-blur-xl border-t sm:border border-border z-40 sm:bottom-4 sm:max-w-lg sm:mx-auto sm:rounded-3xl sm:shadow-2xl pb-safe">
         <div className="flex items-center justify-around h-16 px-1 relative">
-          {/* Tab 1: Tablero */}
+          {/* Tab 1: Viaje */}
           <button
-            onClick={() => setActiveTab('dashboard')}
+            type="button"
+            onClick={() => setActiveTab('trip')}
             className={`flex-1 flex flex-col items-center justify-center gap-1 py-1.5 mx-0.5 rounded-2xl transition-all active:scale-90 select-none touch-manipulation ${
-              activeTab === 'dashboard'
+              activeTab === 'trip'
                 ? 'text-primary font-bold bg-primary/12'
                 : 'text-muted-foreground active:bg-primary/10 active:text-primary'
             }`}
           >
-            <LayoutDashboard className="h-5 w-5" />
-            <span className="text-[10px]">Tablero</span>
+            <Truck className="h-5 w-5" />
+            <span className="text-[10px]">Viaje</span>
           </button>
 
-          {/* Tab 2: Movimientos / Gastos */}
+          {/* Tab 2: Gastos */}
           <button
-            onClick={() => setActiveTab('transactions')}
+            type="button"
+            onClick={() => setActiveTab('gastos')}
             className={`flex-1 flex flex-col items-center justify-center gap-1 py-1.5 mx-0.5 rounded-2xl transition-all active:scale-90 select-none touch-manipulation ${
-              activeTab === 'transactions'
+              activeTab === 'gastos'
                 ? 'text-primary font-bold bg-primary/12'
                 : 'text-muted-foreground active:bg-primary/10 active:text-primary'
             }`}
@@ -550,45 +885,49 @@ export function App() {
             <span className="text-[10px]">Gastos</span>
           </button>
 
-          {/* Botón Central [+] Elevado con interacción táctil llamativa */}
+          {/* Botón Central [+] Elevado (Deshabilitado si !guardado) */}
           <div className="flex-1 flex items-center justify-center">
             <button
               type="button"
+              disabled={!guardado}
               onClick={() => {
-                if (activeTab === 'reminders') {
-                  setIsReminderModalOpen(true)
-                } else {
-                  setIsTxModalOpen(true)
-                }
+                if (guardado) setIsAddModalOpen(true)
               }}
-              className="relative h-16 w-16 -mt-7 shrink-0 rounded-2xl bg-gradient-to-tr from-primary via-primary/95 to-primary/80 text-primary-foreground shadow-xl shadow-primary/40 flex items-center justify-center ring-4 ring-background transition-all active:scale-90 active:rotate-90 active:ring-primary/40 duration-150 ease-out select-none touch-manipulation"
-              title={activeTab === 'reminders' ? 'Nuevo recordatorio 🐾' : 'Registrar nuevo movimiento 🐾'}
+              className={`relative h-16 w-16 -mt-7 shrink-0 rounded-[var(--radius)] flex items-center justify-center ring-4 ring-background transition-all duration-150 ease-out select-none touch-manipulation ${
+                guardado
+                  ? 'bg-gradient-to-tr from-primary via-primary/95 to-primary/80 text-primary-foreground shadow-xl shadow-primary/40 active:scale-90 active:rotate-90 active:ring-primary/40 cursor-pointer'
+                  : 'bg-muted text-muted-foreground/50 border border-border opacity-50 cursor-not-allowed'
+              }`}
+              title={
+                guardado
+                  ? 'Agregar Gasto del Viaje'
+                  : 'Primero completa y guarda la plata inicial y el destino'
+              }
             >
               <Plus className="h-8 w-8 stroke-[2.8]" />
-              <PawPrint className="h-3.5 w-3.5 absolute bottom-1.5 right-1.5 text-primary-foreground/85" />
+              {!guardado && (
+                <Lock className="h-3.5 w-3.5 absolute bottom-1.5 right-1.5 text-muted-foreground" />
+              )}
             </button>
           </div>
 
-          {/* Tab 3: Alertas */}
+          {/* Tab 3: Gráficos */}
           <button
-            onClick={() => setActiveTab('reminders')}
-            className={`flex-1 flex flex-col items-center justify-center gap-1 py-1.5 mx-0.5 rounded-2xl transition-all active:scale-90 select-none relative touch-manipulation ${
-              activeTab === 'reminders'
+            type="button"
+            onClick={() => setActiveTab('charts')}
+            className={`flex-1 flex flex-col items-center justify-center gap-1 py-1.5 mx-0.5 rounded-2xl transition-all active:scale-90 select-none touch-manipulation ${
+              activeTab === 'charts'
                 ? 'text-primary font-bold bg-primary/12'
                 : 'text-muted-foreground active:bg-primary/10 active:text-primary'
             }`}
           >
-            <div className="relative">
-              <Bell className="h-5 w-5" />
-              {pendingRemindersCount > 0 && (
-                <span className="absolute -top-1 -right-1 h-2.5 w-2.5 rounded-full bg-amber-500 ring-2 ring-background animate-pulse" />
-              )}
-            </div>
-            <span className="text-[10px]">Alertas</span>
+            <BarChart3 className="h-5 w-5" />
+            <span className="text-[10px]">Gráficos</span>
           </button>
 
-          {/* Tab 4: Configuración */}
+          {/* Tab 4: Ajustes */}
           <button
+            type="button"
             onClick={() => setActiveTab('settings')}
             className={`flex-1 flex flex-col items-center justify-center gap-1 py-1.5 mx-0.5 rounded-2xl transition-all active:scale-90 select-none touch-manipulation ${
               activeTab === 'settings'
@@ -602,32 +941,17 @@ export function App() {
         </div>
       </nav>
 
-      {/* Modales */}
-      <TransactionModal
-        open={isTxModalOpen}
-        onOpenChange={setIsTxModalOpen}
-        onSave={handleAddTransaction}
-        categories={config.categories}
+      {/* Modal para Agregar Gasto */}
+      <AddGastoModal
+        open={isAddModalOpen}
+        onOpenChange={setIsAddModalOpen}
+        categories={tripState.categories || DEFAULT_TRUCK_CATEGORIES}
         onAddCategory={handleAddCategory}
-        account1Name={account1Name}
-        account2Name={account2Name}
-        account1Emoji={account1Emoji}
-        account2Emoji={account2Emoji}
-        defaultScope={scopeFilter === 'business' ? 'business' : 'personal'}
-      />
-
-      <ReminderModal
-        open={isReminderModalOpen}
-        onOpenChange={setIsReminderModalOpen}
-        onSave={handleAddReminder}
-        account1Name={account1Name}
-        account2Name={account2Name}
-        account1Emoji={account1Emoji}
-        account2Emoji={account2Emoji}
+        defaultMoneda={monedaFilter === 'Plata Chilena' ? 'Plata Chilena' : 'Plata Argentina'}
+        onAddGasto={handleAddGasto}
       />
     </div>
   )
 }
 
 export default App
-
