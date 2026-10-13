@@ -13,7 +13,7 @@ interface TattooModalProps {
   onSave: (
     appointment: Omit<TattooAppointment, 'id' | 'createdAt'>,
     addToIncome: boolean
-  ) => void
+  ) => Promise<void> | void
   initialDate?: string
 }
 
@@ -99,6 +99,15 @@ export function TattooModal({
     }
   }, [open, initialDate])
 
+  // Si cambia la fecha o la hora y alguna alerta elegida quedó en el pasado, ajustarla a 'exact_time'
+  useEffect(() => {
+    setSelectedReminders((prev) => {
+      if (prev.includes('none')) return prev
+      const valid = prev.filter((opt) => !isOptionInPast(selectedDate, time, opt))
+      return valid.length > 0 ? valid : ['exact_time']
+    })
+  }, [selectedDate, time])
+
   const toggleReminder = (optionId: TattooReminderOption) => {
     if (optionId === 'none') {
       setSelectedReminders(['none'])
@@ -122,8 +131,11 @@ export function TattooModal({
     }
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const [isSaving, setIsSaving] = useState(false)
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (isSaving) return
     if (!clientName.trim()) {
       alert('Por favor escribe el nombre del cliente.')
       return
@@ -139,7 +151,12 @@ export function TattooModal({
       reminderOptions: selectedReminders,
     }
 
-    onSave(apptData, addToIncome && !!numericDeposit && numericDeposit > 0)
+    setIsSaving(true)
+    try {
+      await onSave(apptData, addToIncome && !!numericDeposit && numericDeposit > 0)
+    } finally {
+      setIsSaving(false)
+    }
 
     // Resetear formulario
     setClientName('')
@@ -332,10 +349,11 @@ export function TattooModal({
           </Button>
           <Button
             type="submit"
+            disabled={isSaving}
             className="bg-primary hover:bg-primary/90 text-primary-foreground font-bold gap-2 shadow-md shadow-primary/20"
           >
             <PawPrint className="h-4 w-4" />
-            Agendar Turno 🐾
+            {isSaving ? 'Programando alerta...' : 'Agendar Turno 🐾'}
           </Button>
         </DialogFooter>
       </form>

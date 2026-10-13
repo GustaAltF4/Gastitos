@@ -1,9 +1,14 @@
 import webpush from 'web-push'
 
+// Silenciar el warning [DEP0169] de Node 22 causado internamente por la librería web-push (url.parse)
+process.noDeprecation = true
+
 const DEFAULT_VAPID_PUBLIC =
   'BK1IvkCefscA36nPs2gy5Dw2q8UmCouJbBzSPjsuwz0n6Be-EPmg98PNlO-hoo4w02pCeF_5_FKt5Crqlx_SPnY'
 const DEFAULT_VAPID_PRIVATE = 'SXHeMAjh2AMb6Uthq-Fa__gUwz2PqsjmnmdMJd71kZc'
 const MAX_CHUNK_DELAY_SECONDS = 6 * 24 * 60 * 60
+
+const cleanEnv = (val) => (val ? String(val).replace(/^["']|["']$/g, '').trim() : '')
 
 export const handler = async (event) => {
   if (event.httpMethod !== 'POST') {
@@ -22,8 +27,10 @@ export const handler = async (event) => {
 
     // Si el turno era a más de 6 días vista, re-encolamos el tramo restante en QStash automáticamente
     if (typeof fireAt === 'number' && fireAt - now > 45 * 1000) {
-      const qstashToken = process.env.QSTASH_TOKEN
-      const qstashBaseUrl = (process.env.QSTASH_URL || 'https://qstash-eu-central-1.upstash.io').replace(/\/+$/, '')
+      const qstashToken = cleanEnv(process.env.QSTASH_TOKEN)
+      const qstashBaseUrl = (
+        cleanEnv(process.env.QSTASH_URL) || 'https://qstash-eu-central-1.upstash.io'
+      ).replace(/\/+$/, '')
 
       if (qstashToken && destinationUrl) {
         const remainingSeconds = Math.min(
@@ -52,9 +59,11 @@ export const handler = async (event) => {
     }
 
     const vapidPublic =
-      process.env.VITE_VAPID_PUBLIC_KEY || process.env.VAPID_PUBLIC_KEY || DEFAULT_VAPID_PUBLIC
-    const vapidPrivate = process.env.VAPID_PRIVATE_KEY || DEFAULT_VAPID_PRIVATE
-    const vapidSubject = process.env.VAPID_SUBJECT || 'mailto:notificaciones@gastitos.app'
+      cleanEnv(process.env.VITE_VAPID_PUBLIC_KEY) ||
+      cleanEnv(process.env.VAPID_PUBLIC_KEY) ||
+      DEFAULT_VAPID_PUBLIC
+    const vapidPrivate = cleanEnv(process.env.VAPID_PRIVATE_KEY) || DEFAULT_VAPID_PRIVATE
+    const vapidSubject = cleanEnv(process.env.VAPID_SUBJECT) || 'mailto:notificaciones@gastitos.app'
 
     webpush.setVapidDetails(vapidSubject, vapidPublic, vapidPrivate)
 

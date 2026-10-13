@@ -1,11 +1,16 @@
 import webpush from 'web-push'
 
+// Silenciar el warning [DEP0169] de Node 22 causado internamente por la librería web-push (url.parse)
+process.noDeprecation = true
+
 const DEFAULT_VAPID_PUBLIC =
   'BK1IvkCefscA36nPs2gy5Dw2q8UmCouJbBzSPjsuwz0n6Be-EPmg98PNlO-hoo4w02pCeF_5_FKt5Crqlx_SPnY'
 const DEFAULT_VAPID_PRIVATE = 'SXHeMAjh2AMb6Uthq-Fa__gUwz2PqsjmnmdMJd71kZc'
 
 // Límite seguro por tramo en QStash gratuito (6 días en segundos; si falta más, send-push re-encola automáticamente)
 const MAX_CHUNK_DELAY_SECONDS = 6 * 24 * 60 * 60
+
+const cleanEnv = (val) => (val ? String(val).replace(/^["']|["']$/g, '').trim() : '')
 
 export const handler = async (event) => {
   const headers = {
@@ -19,8 +24,10 @@ export const handler = async (event) => {
     return { statusCode: 204, headers, body: '' }
   }
 
-  const qstashToken = process.env.QSTASH_TOKEN
-  const qstashBaseUrl = (process.env.QSTASH_URL || 'https://qstash-eu-central-1.upstash.io').replace(/\/+$/, '')
+  const qstashToken = cleanEnv(process.env.QSTASH_TOKEN)
+  const qstashBaseUrl = (
+    cleanEnv(process.env.QSTASH_URL) || 'https://qstash-eu-central-1.upstash.io'
+  ).replace(/\/+$/, '')
 
   try {
     // Cancelar un mensaje programado en QStash cuando se elimina o completa un recordatorio/turno
@@ -77,13 +84,6 @@ export const handler = async (event) => {
       }
     }
 
-    const vapidPublic =
-      process.env.VITE_VAPID_PUBLIC_KEY || process.env.VAPID_PUBLIC_KEY || DEFAULT_VAPID_PUBLIC
-    const vapidPrivate = process.env.VAPID_PRIVATE_KEY || DEFAULT_VAPID_PRIVATE
-    const vapidSubject = process.env.VAPID_SUBJECT || 'mailto:notificaciones@gastitos.app'
-
-    webpush.setVapidDetails(vapidSubject, vapidPublic, vapidPrivate)
-
     const now = Date.now()
     const targetTimestamp =
       typeof fireAt === 'number'
@@ -96,6 +96,15 @@ export const handler = async (event) => {
 
     // Si es un envío inmediato (o no hay QSTASH_TOKEN y el delay es <= 10s), enviamos directo con web-push
     if (totalRemainingSeconds <= 1 || (!qstashToken && totalRemainingSeconds <= 10)) {
+      const vapidPublic =
+        cleanEnv(process.env.VITE_VAPID_PUBLIC_KEY) ||
+        cleanEnv(process.env.VAPID_PUBLIC_KEY) ||
+        DEFAULT_VAPID_PUBLIC
+      const vapidPrivate = cleanEnv(process.env.VAPID_PRIVATE_KEY) || DEFAULT_VAPID_PRIVATE
+      const vapidSubject = cleanEnv(process.env.VAPID_SUBJECT) || 'mailto:notificaciones@gastitos.app'
+
+      webpush.setVapidDetails(vapidSubject, vapidPublic, vapidPrivate)
+
       if (totalRemainingSeconds > 0) {
         await new Promise((r) => setTimeout(r, totalRemainingSeconds * 1000))
       }

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'gastitos-v4'
+const CACHE_NAME = 'gastitos-v5'
 const PRECACHE_ASSETS = [
   '/',
   '/index.html',

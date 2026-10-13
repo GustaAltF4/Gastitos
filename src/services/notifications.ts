@@ -115,10 +115,16 @@ function popQstashMessageId(notificationId: number): string | undefined {
   }
 }
 
+let cachedPushSubscription: PushSubscription | null = null
+
 // Obtener o crear la suscripción Web Push del Service Worker (iOS 16.4+ PWA / Android)
 async function getOrCreatePushSubscription(): Promise<PushSubscription | null> {
   if (typeof window === 'undefined' || !('serviceWorker' in navigator) || !('PushManager' in window)) {
     return null
+  }
+
+  if (cachedPushSubscription && cachedPushSubscription.endpoint) {
+    return cachedPushSubscription
   }
 
   try {
@@ -137,6 +143,7 @@ async function getOrCreatePushSubscription(): Promise<PushSubscription | null> {
       })
     }
 
+    cachedPushSubscription = subscription
     return subscription
   } catch (err) {
     reportNotificationError('ERR-PUSH-SUB', 'Suscribir PushManager (iOS/PWA)', err)
@@ -145,6 +152,7 @@ async function getOrCreatePushSubscription(): Promise<PushSubscription | null> {
 }
 
 // Enviar programación de Push en segundo plano a la función de Netlify + QStash
+// Incluye reintento automático para cuando iOS WebKit despierta de pantalla bloqueada con un socket HTTP/2 caído ("TypeError: Load failed")
 async function scheduleRemoteWebPush(params: {
   notificationId: number
   title: string
@@ -156,43 +164,59 @@ async function scheduleRemoteWebPush(params: {
   const subscription = await getOrCreatePushSubscription()
   if (!subscription) return false
 
-  try {
-    const response = await fetch('/.netlify/functions/schedule-push', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        subscription: subscription.toJSON(),
-        title: params.title,
-        body: params.body,
-        fireAt: params.fireAt,
-        delaySeconds: params.delaySeconds,
-        tag: params.tag || String(params.notificationId),
-        url: '/',
-      }),
-    })
+  const payloadStr = JSON.stringify({
+    subscription: subscription.toJSON(),
+    title: params.title,
+    body: params.body,
+    fireAt: params.fireAt,
+    delaySeconds: params.delaySeconds,
+    tag: params.tag || String(params.notificationId),
+    url: '/',
+  })
 
-    const data = await response.json().catch(() => ({}))
-    if (!response.ok) {
-      reportNotificationError(
-        data.code || 'ERR-NETLIFY-PUSH',
-        'Programar Web Push en Netlify/QStash',
-        new Error(data.error || `HTTP ${response.status}`)
-      )
-      return false
-    }
+  let lastErr: unknown = null
 
-    if (data.messageId && params.notificationId) {
-      saveQstashMessageId(params.notificationId, data.messageId)
-    }
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      const response = await fetch(`/.netlify/functions/schedule-push?_t=${Date.now()}_${attempt}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-cache, no-store',
+        },
+        cache: 'no-store',
+        keepalive: true,
+        body: payloadStr,
+      })
 
-    return true
-  } catch (err) {
-    // Si está corriendo en localhost sin `netlify dev`, no bloquear las notificaciones locales
-    if (typeof window !== 'undefined' && window.location.hostname !== 'localhost') {
-      reportNotificationError('ERR-PUSH-NETWORK', 'Conectar con /.netlify/functions/schedule-push', err)
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok) {
+        reportNotificationError(
+          data.code || 'ERR-NETLIFY-PUSH',
+          'Programar Web Push en Netlify/QStash',
+          new Error(data.error || `HTTP ${response.status}`)
+        )
+        return false
+      }
+
+      if (data.messageId && params.notificationId) {
+        saveQstashMessageId(params.notificationId, data.messageId)
+      }
+
+      return true
+    } catch (err) {
+      lastErr = err
+      if (attempt < 3) {
+        await new Promise((r) => setTimeout(r, 350 * attempt))
+      }
     }
-    return false
   }
+
+  // Si está corriendo en localhost sin `netlify dev`, no bloquear las notificaciones locales
+  if (typeof window !== 'undefined' && window.location.hostname !== 'localhost') {
+    reportNotificationError('ERR-PUSH-NETWORK', 'Conectar con /.netlify/functions/schedule-push', lastErr)
+  }
+  return false
 }
 
 // Mostrar notificación a través del Service Worker (estándar requerido por iOS PWA)
@@ -498,8 +522,10 @@ export const notificationService = {
 
     for (const opt of activeOptions) {
       const alertDate = calculateTattooAlertDate(appointment.date, appointment.time, opt)
-      if (!alertDate || alertDate.getTime() <= now.getTime()) continue
+      // Permitir si está en el futuro o dentro del minuto actual (para pruebas al minuto siguiente)
+      if (!alertDate || alertDate.getTime() <= now.getTime() - 60000) continue
 
+      const effectiveTargetTime = Math.max(alertDate.getTime(), now.getTime() + 5000)
       const id = Math.floor(Math.random() * 900000) + 100000
       let label = ''
       if (opt === '2_days_before') label = 'En 2 días tienes turno'
@@ -517,12 +543,12 @@ export const notificationService = {
         notificationId: id,
         title,
         body,
-        fireAt: alertDate.getTime(),
+        fireAt: effectiveTargetTime,
         tag,
       })
 
+      const delayMs = Math.max(1000, effectiveTargetTime - now.getTime())
       if (!pushScheduled) {
-        const delayMs = alertDate.getTime() - now.getTime()
         if (delayMs > 0 && delayMs < 7 * 24 * 60 * 60 * 1000) {
           setTimeout(() => {
             playChimeSound()
@@ -532,7 +558,6 @@ export const notificationService = {
           }, delayMs)
         }
       } else {
-        const delayMs = alertDate.getTime() - now.getTime()
         if (delayMs > 0 && delayMs < 24 * 60 * 60 * 1000) {
           setTimeout(() => {
             playChimeSound()

@@ -243,16 +243,23 @@ export function App() {
       await storageService.saveTransactions(updatedTxs)
     }
 
+    // Guardar de inmediato en estado y almacenamiento para que la UI refleje el turno al instante
+    const initialUpdated = [...tattooAppointments, newAppt]
+    setTattooAppointments(initialUpdated)
+    await storageService.saveTattooAppointments(initialUpdated)
+
     // Programar múltiples notificaciones según las opciones elegidas
     const notifIds = await notificationService.scheduleTattooNotifications(newAppt)
     if (notifIds.length > 0) {
-      newAppt.notificationIds = notifIds
-      newAppt.notificationId = notifIds[0]
+      const withNotifIds: TattooAppointment = {
+        ...newAppt,
+        notificationIds: notifIds,
+        notificationId: notifIds[0],
+      }
+      const finalUpdated = initialUpdated.map((a) => (a.id === newAppt.id ? withNotifIds : a))
+      setTattooAppointments(finalUpdated)
+      await storageService.saveTattooAppointments(finalUpdated)
     }
-
-    const updated = [...tattooAppointments, newAppt]
-    setTattooAppointments(updated)
-    await storageService.saveTattooAppointments(updated)
   }
 
   const handleDeleteTattooAppointment = async (id: string) => {
