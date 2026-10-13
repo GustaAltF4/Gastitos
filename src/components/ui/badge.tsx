@@ -19,9 +19,9 @@ const badgeVariants = cva(
         warning:
           "border-transparent bg-amber-500/15 text-amber-600 dark:text-amber-400",
         business:
-          "border-indigo-200 bg-indigo-50 text-indigo-700 dark:bg-indigo-950/50 dark:text-indigo-300 dark:border-indigo-800",
+          "border-primary/40 bg-primary/10 text-primary",
         personal:
-          "border-primary/30 bg-primary/10 text-primary dark:border-primary/40",
+          "border-transparent bg-primary text-primary-foreground",
       },
     },
     defaultVariants: {

@@ -2,7 +2,7 @@ name: Compilar APK Android (Gastitos)
 
 on:
   push:
-    branches: [ main, master ]
+    branches: [ main, master, v2_vivi ]
   workflow_dispatch:
 
 jobs:

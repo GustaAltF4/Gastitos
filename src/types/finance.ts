@@ -36,8 +36,11 @@ export interface CategoryInfo {
 }
 
 export const DEFAULT_CATEGORIES: string[] = [
-  'General',
+  'Sueldo / Haberes',
+  'Supermercado',
   'Servicios',
+  'Salud / Farmacia',
   'Compras',
-  'Ingresos',
+  'General',
 ]
+

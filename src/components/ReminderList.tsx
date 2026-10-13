@@ -10,8 +10,6 @@ import {
   Clock,
   Trash2,
   AlertTriangle,
-  Briefcase,
-  User,
   Volume2,
   Plus,
 } from 'lucide-react'
@@ -24,6 +22,10 @@ interface ReminderListProps {
   onTestNotification: () => void
   onCreateNew: () => void
   currency: string
+  account1Name?: string
+  account2Name?: string
+  account1Emoji?: string
+  account2Emoji?: string
 }
 
 export function ReminderList({
@@ -33,6 +35,10 @@ export function ReminderList({
   onTestNotification,
   onCreateNew,
   currency,
+  account1Name = 'Vivi',
+  account2Name = 'Papá',
+  account1Emoji = '👩',
+  account2Emoji = '👨',
 }: ReminderListProps) {
   const now = new Date().getTime()
 
@@ -74,7 +80,7 @@ export function ReminderList({
               variant="outline"
               size="sm"
               onClick={onTestNotification}
-              className="text-xs flex items-center gap-1.5 border-amber-300 dark:border-amber-800 text-amber-700 dark:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-950/40"
+              className="text-xs flex items-center gap-1.5 border-amber-300 dark:border-amber-800 text-amber-700 dark:text-amber-300 active:bg-amber-500/20"
             >
               <Volume2 className="h-3.5 w-3.5" />
               Probar Sonido
@@ -99,7 +105,7 @@ export function ReminderList({
             </div>
             <h3 className="text-sm font-bold text-foreground">No tienes recordatorios activos</h3>
             <p className="text-xs text-muted-foreground mt-1 max-w-sm mb-4">
-              Programa alertas para el pago de internet, alquiler, tarjetas o cobro a clientes. Sonarán automáticamente en tu dispositivo.
+              Programa alertas para el pago de internet, alquiler, tarjetas o servicios. Sonarán automáticamente en tu dispositivo.
             </p>
             <Button onClick={onCreateNew} className="gap-2 shadow-md">
               <Plus className="h-4 w-4" />
@@ -117,23 +123,23 @@ export function ReminderList({
               return (
                 <div
                   key={rem.id}
-                  className={`py-3.5 flex items-start sm:items-center justify-between gap-2 sm:gap-3 group px-1 sm:px-2 rounded-xl transition-colors ${
+                  className={`py-3.5 flex items-start sm:items-center justify-between gap-2 sm:gap-3 px-1.5 sm:px-2 rounded-xl transition-all duration-100 active:scale-[0.98] touch-manipulation ${
                     rem.status === 'completed'
                       ? 'opacity-60 bg-muted/20'
                       : isOverdue
                       ? 'bg-rose-50/50 dark:bg-rose-950/20'
                       : isDueSoon
                       ? 'bg-amber-50/50 dark:bg-amber-950/20'
-                      : 'hover:bg-muted/30'
+                      : 'active:bg-primary/10'
                   }`}
                 >
                   <div className="flex items-start gap-2.5 sm:gap-3 min-w-0 flex-1">
                     <button
                       onClick={() => handleMarkComplete(rem.id)}
-                      className={`mt-0.5 sm:mt-0 p-1 rounded-full shrink-0 transition-colors ${
+                      className={`mt-0.5 sm:mt-0 p-1.5 rounded-full shrink-0 transition-all active:scale-75 touch-manipulation ${
                         rem.status === 'completed'
-                          ? 'text-primary bg-primary/10'
-                          : 'text-muted-foreground hover:text-primary hover:bg-primary/10'
+                          ? 'text-primary bg-primary/15'
+                          : 'text-muted-foreground bg-muted/60 border border-border active:text-primary active:bg-primary/20'
                       }`}
                       title={rem.status === 'completed' ? 'Completado' : 'Marcar como pagado'}
                     >
@@ -170,15 +176,15 @@ export function ReminderList({
 
                         <Badge
                           variant={rem.scope === 'business' ? 'business' : 'personal'}
-                          className="text-[10px] py-0 px-1.5 font-normal"
+                          className="text-[10px] py-0 px-1.5 font-medium"
                         >
                           {rem.scope === 'business' ? (
                             <span className="flex items-center gap-0.5">
-                              <Briefcase className="h-2.5 w-2.5" /> Negocio
+                              <span>{account2Emoji}</span> {account2Name}
                             </span>
                           ) : (
                             <span className="flex items-center gap-0.5">
-                              <User className="h-2.5 w-2.5" /> Personal
+                              <span>{account1Emoji}</span> {account1Name}
                             </span>
                           )}
                         </Badge>
@@ -208,7 +214,7 @@ export function ReminderList({
 
                     <button
                       onClick={() => onDelete(rem.id)}
-                      className="h-8 w-8 sm:h-9 sm:w-9 rounded-xl flex items-center justify-center text-rose-600 dark:text-rose-400 bg-rose-500/10 hover:bg-rose-500/20 active:bg-rose-500/30 border border-rose-500/25 active:scale-90 transition-all select-none shrink-0"
+                      className="h-8 w-8 sm:h-9 sm:w-9 rounded-xl flex items-center justify-center text-rose-600 dark:text-rose-400 bg-rose-500/12 active:bg-rose-600 active:text-white border border-rose-500/30 active:scale-90 transition-all select-none shrink-0 touch-manipulation shadow-2xs"
                       title="Eliminar este recordatorio"
                       aria-label="Eliminar recordatorio"
                     >

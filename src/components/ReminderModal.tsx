@@ -3,18 +3,30 @@ import { Dialog, DialogHeader, DialogTitle, DialogDescription, DialogFooter } fr
 import { Button } from './ui/button'
 import { Input } from './ui/input'
 import { Reminder, TransactionScope } from '../types/finance'
-import { Bell, Briefcase, User, Calendar, Clock, PawPrint } from 'lucide-react'
+import { Bell, Calendar, PawPrint } from 'lucide-react'
 
 interface ReminderModalProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   onSave: (reminder: Omit<Reminder, 'id' | 'notificationId' | 'status' | 'createdAt'>) => void
+  account1Name?: string
+  account2Name?: string
+  account1Emoji?: string
+  account2Emoji?: string
 }
 
-export function ReminderModal({ open, onOpenChange, onSave }: ReminderModalProps) {
+export function ReminderModal({
+  open,
+  onOpenChange,
+  onSave,
+  account1Name = 'Vivi',
+  account2Name = 'Papá',
+  account1Emoji = '👩',
+  account2Emoji = '👨',
+}: ReminderModalProps) {
   const [title, setTitle] = useState('')
   const [amount, setAmount] = useState('')
-  const [scope, setScope] = useState<TransactionScope>('business')
+  const [scope, setScope] = useState<TransactionScope>('personal')
   const [notes, setNotes] = useState('')
 
   // Fecha y hora por defecto: dentro de 3 días a las 10:00 AM
@@ -72,7 +84,7 @@ export function ReminderModal({ open, onOpenChange, onSave }: ReminderModalProps
           </label>
           <Input
             required
-            placeholder="Ej: Pagar Internet Fibra, Vencimiento ARBA, Comprar repuestos..."
+            placeholder="Ej: Pagar Luz, Internet, Tarjeta, Farmacia..."
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             className="text-base"
@@ -83,7 +95,7 @@ export function ReminderModal({ open, onOpenChange, onSave }: ReminderModalProps
         {/* Selector Exacto de Fecha y Hora */}
         <div>
           <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1 mb-1.5">
-            <Calendar className="h-3.5 w-3.5 text-indigo-500" />
+            <Calendar className="h-3.5 w-3.5 text-primary" />
             Fecha y Hora Exacta de la Alerta
           </label>
           <Input
@@ -118,35 +130,35 @@ export function ReminderModal({ open, onOpenChange, onSave }: ReminderModalProps
           </div>
         </div>
 
-        {/* Ámbito: Negocio vs Personal */}
+        {/* Cuenta asociada: Cuenta 1 (Vivi) vs Cuenta 2 (Papá) */}
         <div>
           <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block mb-1.5">
-            Ámbito
+            ¿Con qué cuenta se paga?
           </label>
           <div className="grid grid-cols-2 gap-2">
             <button
               type="button"
-              onClick={() => setScope('business')}
-              className={`flex items-center justify-center gap-2 p-2 rounded-xl border text-xs font-medium transition-transform duration-100 active:scale-95 select-none ${
-                scope === 'business'
-                  ? 'border-indigo-600 bg-indigo-50 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300 ring-2 ring-indigo-500/20'
+              onClick={() => setScope('personal')}
+              className={`flex items-center justify-center gap-2 p-2.5 rounded-xl border text-xs font-semibold transition-transform duration-100 active:scale-95 select-none text-center leading-tight ${
+                scope === 'personal'
+                  ? 'border-primary bg-primary text-primary-foreground shadow-sm ring-2 ring-primary/25'
                   : 'border-border bg-card text-muted-foreground'
               }`}
             >
-              <Briefcase className="h-3.5 w-3.5" />
-              Negocio / Trabajo
+              <span className="text-sm leading-none shrink-0">{account1Emoji}</span>
+              <span className="truncate">{account1Name}</span>
             </button>
             <button
               type="button"
-              onClick={() => setScope('personal')}
-              className={`flex items-center justify-center gap-2 p-2 rounded-xl border text-xs font-medium transition-transform duration-100 active:scale-95 select-none ${
-                scope === 'personal'
-                  ? 'border-primary bg-primary/10 text-primary ring-2 ring-primary/20'
+              onClick={() => setScope('business')}
+              className={`flex items-center justify-center gap-2 p-2.5 rounded-xl border text-xs font-semibold transition-transform duration-100 active:scale-95 select-none text-center leading-tight ${
+                scope === 'business'
+                  ? 'border-primary bg-primary/15 text-primary ring-2 ring-primary/25 shadow-sm'
                   : 'border-border bg-card text-muted-foreground'
               }`}
             >
-              <User className="h-3.5 w-3.5" />
-              Personal
+              <span className="text-sm leading-none shrink-0">{account2Emoji}</span>
+              <span className="truncate">{account2Name}</span>
             </button>
           </div>
         </div>
@@ -173,7 +185,7 @@ export function ReminderModal({ open, onOpenChange, onSave }: ReminderModalProps
           </Button>
           <Button
             type="submit"
-            className="bg-amber-600 hover:bg-amber-700 text-white gap-1.5"
+            className="bg-amber-600 active:bg-amber-700 text-white gap-1.5"
           >
             <PawPrint className="h-4 w-4" />
             Programar Alerta

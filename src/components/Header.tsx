@@ -16,7 +16,7 @@ export function Header({
       <div className="container max-w-5xl mx-auto px-4 h-14 sm:h-16 flex items-center justify-between gap-3">
         {/* Logo / Nombre Gastitos */}
         <div className="flex items-center gap-3 min-w-0">
-          <div className="relative h-10 w-10 shrink-0 rounded-2xl bg-gradient-to-tr from-primary to-primary/80 flex items-center justify-center text-primary-foreground shadow-md shadow-primary/25 transition-transform duration-200 hover:scale-105 select-none">
+          <div className="relative h-10 w-10 shrink-0 rounded-2xl bg-gradient-to-tr from-primary to-primary/80 flex items-center justify-center text-primary-foreground shadow-md shadow-primary/25 transition-transform duration-150 active:scale-90 active:-rotate-6 select-none touch-manipulation">
             <Cat className="h-6 w-6" strokeWidth={2.2} />
             <span
               className="absolute -bottom-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-amber-400 text-[10px] text-zinc-950 font-black shadow-sm ring-2 ring-background leading-none select-none"
@@ -40,19 +40,19 @@ export function Header({
           </div>
         </div>
 
-        {/* Botón Modo Oscuro/Claro con estética felina */}
+        {/* Botón Modo Oscuro/Claro con estética felina táctil */}
         <div className="flex items-center gap-1">
           <button
             onClick={onToggleDarkMode}
             title={darkMode ? 'Modo diurno (Gatito de día)' : 'Modo nocturno (Gatito de noche)'}
-            className="relative p-2.5 rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted transition-transform active:scale-90 group"
+            className="relative p-2.5 rounded-xl bg-muted/60 border border-border/80 text-foreground shadow-2xs transition-all duration-150 active:scale-90 active:rotate-12 active:bg-primary/20 active:border-primary touch-manipulation select-none"
             aria-label="Cambiar tema claro u oscuro"
           >
-            <Cat className="h-5 w-5 transition-transform duration-200 group-hover:rotate-6 text-foreground" strokeWidth={2} />
+            <Cat className="h-5 w-5 text-foreground" strokeWidth={2} />
             {darkMode ? (
               <Sun className="h-3.5 w-3.5 absolute top-1 right-1 text-amber-400 fill-amber-400 drop-shadow-xs" />
             ) : (
-              <Moon className="h-3.5 w-3.5 absolute top-1 right-1 text-indigo-400 fill-indigo-400 drop-shadow-xs" />
+              <Moon className="h-3.5 w-3.5 absolute top-1 right-1 text-primary fill-primary drop-shadow-xs" />
             )}
           </button>
         </div>

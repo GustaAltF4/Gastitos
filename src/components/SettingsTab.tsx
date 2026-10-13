@@ -118,10 +118,10 @@ export function SettingsTab({
                     key={col.id}
                     type="button"
                     onClick={() => onUpdateConfig({ themeColor: col.id })}
-                    className={`flex flex-col items-center gap-2 p-3 rounded-2xl border transition-all ${
+                    className={`flex flex-col items-center gap-2 p-3 rounded-2xl border transition-all active:scale-95 touch-manipulation select-none ${
                       isSelected
-                        ? 'border-primary bg-primary/10 shadow-sm ring-2 ring-primary/20 scale-102'
-                        : 'border-border hover:bg-muted/40'
+                        ? 'border-primary bg-primary/15 shadow-sm ring-2 ring-primary/30 scale-102'
+                        : 'border-border active:bg-primary/10 active:border-primary/40'
                     }`}
                   >
                     <div
@@ -158,10 +158,10 @@ export function SettingsTab({
                     key={opt.id}
                     type="button"
                     onClick={() => onUpdateConfig({ borderRadius: opt.id })}
-                    className={`flex flex-col items-center justify-center p-3 border transition-all ${opt.previewPx} ${
+                    className={`flex flex-col items-center justify-center p-3 border transition-all active:scale-95 touch-manipulation select-none ${opt.previewPx} ${
                       isSelected
-                        ? 'border-primary bg-primary/10 ring-2 ring-primary/30 font-bold'
-                        : 'border-border hover:bg-muted/40'
+                        ? 'border-primary bg-primary/15 ring-2 ring-primary/30 font-bold'
+                        : 'border-border active:bg-primary/10 active:border-primary/40'
                     }`}
                   >
                     <div
@@ -189,7 +189,7 @@ export function SettingsTab({
             </div>
             <button
               onClick={() => onUpdateConfig({ darkMode: !config.darkMode })}
-              className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+              className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-all duration-200 ease-in-out active:scale-90 touch-manipulation focus:outline-none ${
                 config.darkMode ? 'bg-primary' : 'bg-muted'
               }`}
             >
@@ -216,8 +216,8 @@ export function SettingsTab({
             <button
               type="button"
               onClick={handleResetCategories}
-              className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors px-2 py-1 rounded-lg hover:bg-muted"
-              title="Restablecer a las 4 categorías básicas"
+              className="text-xs text-primary bg-primary/10 border border-primary/25 font-semibold flex items-center gap-1 transition-all px-2.5 py-1 rounded-full active:scale-95 active:bg-primary active:text-primary-foreground touch-manipulation select-none"
+              title="Restablecer a las categorías básicas"
             >
               <RotateCcw className="h-3 w-3" />
               Restablecer iniciales
@@ -261,13 +261,13 @@ export function SettingsTab({
               {categories.map((cat) => (
                 <div
                   key={cat}
-                  className="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-border bg-card shadow-sm text-sm font-medium text-foreground hover:border-primary/50 transition-colors"
+                  className="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-border bg-card shadow-xs text-sm font-medium text-foreground"
                 >
                   <span>{cat}</span>
                   <button
                     type="button"
                     onClick={() => handleRemoveCategory(cat)}
-                    className="text-muted-foreground hover:text-red-500 transition-colors p-0.5 rounded-full hover:bg-red-500/10"
+                    className="text-rose-500 bg-rose-500/10 border border-rose-500/20 transition-all p-1 rounded-lg active:scale-90 active:bg-rose-600 active:text-white touch-manipulation"
                     title={`Eliminar categoría ${cat}`}
                   >
                     <Trash2 className="h-3.5 w-3.5" />
@@ -279,28 +279,104 @@ export function SettingsTab({
         </CardContent>
       </Card>
 
-      {/* 3. Preferencias Financieras & Perfil */}
+      {/* 3. Preferencias Financieras, Mis 2 Cuentas & Perfil */}
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-base font-bold flex items-center gap-2">
             <Coins className="h-5 w-5 text-amber-500" />
-            Moneda e Identidad
+            Mis 2 Cuentas y Moneda
           </CardTitle>
           <CardDescription>
-            Configura cómo se expresan tus valores y el nombre de tu cuenta.
+            Personaliza el nombre y el emoticón de cada una de las 2 cuentas y la moneda principal.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {/* Nombre / Alias */}
+            {/* Cuenta 1 */}
+            <div className="p-3 rounded-2xl border border-border bg-muted/20 space-y-2.5">
+              <label className="text-xs font-semibold text-primary uppercase tracking-wider flex items-center gap-1">
+                <User className="h-3.5 w-3.5" /> Cuenta 1 (Nombre y Emoticón)
+              </label>
+              <div className="flex items-center gap-2">
+                <Input
+                  value={config.account1Emoji || '👩'}
+                  onChange={(e) => onUpdateConfig({ account1Emoji: e.target.value })}
+                  className="w-14 text-center text-lg px-1 shrink-0"
+                  maxLength={4}
+                  title="Emoticón de Cuenta 1"
+                />
+                <Input
+                  value={config.account1Name || ''}
+                  onChange={(e) => onUpdateConfig({ account1Name: e.target.value })}
+                  placeholder="Ej: Vivi"
+                  className="flex-1"
+                />
+              </div>
+              <div className="flex flex-wrap gap-1.5 pt-0.5">
+                {['👩', '👵', '💖', '🌸', '🐱', '🐾', '💼', '💵', '⭐', '🏠'].map((emoji) => (
+                  <button
+                    key={emoji}
+                    type="button"
+                    onClick={() => onUpdateConfig({ account1Emoji: emoji })}
+                    className={`h-8 w-8 rounded-xl text-sm flex items-center justify-center transition-all active:scale-85 touch-manipulation select-none ${
+                      (config.account1Emoji || '👩') === emoji
+                        ? 'bg-primary text-primary-foreground shadow-sm shadow-primary/30 scale-105 ring-2 ring-primary/30'
+                        : 'bg-card border border-border/80 active:bg-primary/20'
+                    }`}
+                  >
+                    {emoji}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Cuenta 2 */}
+            <div className="p-3 rounded-2xl border border-border bg-muted/20 space-y-2.5">
+              <label className="text-xs font-semibold text-primary uppercase tracking-wider flex items-center gap-1">
+                <User className="h-3.5 w-3.5" /> Cuenta 2 (Nombre y Emoticón)
+              </label>
+              <div className="flex items-center gap-2">
+                <Input
+                  value={config.account2Emoji || '👨'}
+                  onChange={(e) => onUpdateConfig({ account2Emoji: e.target.value })}
+                  className="w-14 text-center text-lg px-1 shrink-0"
+                  maxLength={4}
+                  title="Emoticón de Cuenta 2"
+                />
+                <Input
+                  value={config.account2Name || ''}
+                  onChange={(e) => onUpdateConfig({ account2Name: e.target.value })}
+                  placeholder="Ej: Papá"
+                  className="flex-1"
+                />
+              </div>
+              <div className="flex flex-wrap gap-1.5 pt-0.5">
+                {['👨', '👴', '💙', '🧔', '🐶', '🐾', '💼', '💵', '🛠️', '🚗'].map((emoji) => (
+                  <button
+                    key={emoji}
+                    type="button"
+                    onClick={() => onUpdateConfig({ account2Emoji: emoji })}
+                    className={`h-8 w-8 rounded-xl text-sm flex items-center justify-center transition-all active:scale-85 touch-manipulation select-none ${
+                      (config.account2Emoji || '👨') === emoji
+                        ? 'bg-primary text-primary-foreground shadow-sm shadow-primary/30 scale-105 ring-2 ring-primary/30'
+                        : 'bg-card border border-border/80 active:bg-primary/20'
+                    }`}
+                  >
+                    {emoji}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Nombre / Título General */}
             <div>
               <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block mb-1.5 flex items-center gap-1">
-                <User className="h-3.5 w-3.5" /> Nombre o Negocio
+                <User className="h-3.5 w-3.5" /> Título General en Cabecera
               </label>
               <Input
                 value={config.userName}
                 onChange={(e) => onUpdateConfig({ userName: e.target.value })}
-                placeholder="Ej: Mi Negocio / Gastos Personales"
+                placeholder="Ej: Cuentas Vivi y Papá"
               />
             </div>
 
@@ -348,7 +424,7 @@ export function SettingsTab({
           <Button
             variant="outline"
             onClick={onTestNotification}
-            className="border-amber-300 dark:border-amber-800 text-amber-700 dark:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-950/40 shrink-0"
+            className="border-amber-300 dark:border-amber-800 text-amber-700 dark:text-amber-300 active:bg-amber-500/20 shrink-0"
           >
             <PawPrint className="h-4 w-4 mr-2 text-amber-500" />
             Probar Notificación 🐾
@@ -372,7 +448,7 @@ export function SettingsTab({
             <Button
               variant="outline"
               onClick={onDownloadPdf}
-              className="w-full flex items-center justify-center gap-2 h-11 border-primary/40 hover:border-primary text-foreground font-semibold shadow-sm"
+              className="w-full flex items-center justify-center gap-2 h-11 border-primary/40 active:border-primary active:bg-primary/15 text-foreground font-semibold shadow-sm"
             >
               <FileText className="h-4 w-4 text-primary" />
               Descargar Informe PDF

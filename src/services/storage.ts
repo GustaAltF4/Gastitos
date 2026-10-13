@@ -20,6 +20,10 @@ export const RADIUS_VALUES: Record<BorderRadius, string> = {
 export interface UserConfig {
   currency: string
   userName: string
+  account1Name: string
+  account2Name: string
+  account1Emoji: string
+  account2Emoji: string
   darkMode: boolean
   themeColor: ThemeColor
   borderRadius: BorderRadius
@@ -31,7 +35,11 @@ export interface UserConfig {
 
 const DEFAULT_CONFIG: UserConfig = {
   currency: 'ARS',
-  userName: 'Mi Negocio / Finanzas',
+  userName: 'Cuentas Vivi y Papá',
+  account1Name: 'Vivi',
+  account2Name: 'Papá',
+  account1Emoji: '👩',
+  account2Emoji: '👨',
   darkMode: false,
   themeColor: 'emerald',
   borderRadius: 'md',
@@ -89,9 +97,17 @@ export const storageService = {
       const { value } = await Preferences.get({ key: USER_CONFIG_KEY })
       if (!value) return DEFAULT_CONFIG
       const parsed = JSON.parse(value)
+      const rawAcc1 = parsed.account1Name?.trim()
+      const rawAcc2 = parsed.account2Name?.trim()
       return {
         ...DEFAULT_CONFIG,
         ...parsed,
+        account1Name:
+          !rawAcc1 || rawAcc1 === 'Sueldo Vivi' ? DEFAULT_CONFIG.account1Name : rawAcc1,
+        account2Name:
+          !rawAcc2 || rawAcc2 === 'Sueldo Papá' ? DEFAULT_CONFIG.account2Name : rawAcc2,
+        account1Emoji: parsed.account1Emoji?.trim() || DEFAULT_CONFIG.account1Emoji,
+        account2Emoji: parsed.account2Emoji?.trim() || DEFAULT_CONFIG.account2Emoji,
         categories:
           Array.isArray(parsed.categories) && parsed.categories.length > 0
             ? parsed.categories

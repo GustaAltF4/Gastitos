@@ -1,10 +1,10 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Dialog, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from './ui/dialog'
 import { Button } from './ui/button'
 import { Input } from './ui/input'
 import { Transaction, TransactionType, TransactionScope, DEFAULT_CATEGORIES } from '../types/finance'
 import { getLocalDateString } from '../lib/utils'
-import { ArrowDownRight, ArrowUpRight, Briefcase, User, Plus, X, PawPrint } from 'lucide-react'
+import { ArrowDownRight, ArrowUpRight, Plus, X, PawPrint } from 'lucide-react'
 
 interface TransactionModalProps {
   open: boolean
@@ -12,6 +12,11 @@ interface TransactionModalProps {
   onSave: (tx: Omit<Transaction, 'id' | 'createdAt'>) => void
   categories?: string[]
   onAddCategory?: (category: string) => void
+  account1Name?: string
+  account2Name?: string
+  account1Emoji?: string
+  account2Emoji?: string
+  defaultScope?: TransactionScope
 }
 
 export function TransactionModal({
@@ -20,15 +25,27 @@ export function TransactionModal({
   onSave,
   categories = DEFAULT_CATEGORIES,
   onAddCategory,
+  account1Name = 'Vivi',
+  account2Name = 'Papá',
+  account1Emoji = '👩',
+  account2Emoji = '👨',
+  defaultScope = 'personal',
 }: TransactionModalProps) {
   const [type, setType] = useState<TransactionType>('expense')
   const [amount, setAmount] = useState('')
   const [description, setDescription] = useState('')
   const [category, setCategory] = useState('')
-  const [scope, setScope] = useState<TransactionScope>('business')
+  const [scope, setScope] = useState<TransactionScope>(defaultScope)
   const [date, setDate] = useState(() => getLocalDateString())
   const [isCreatingCategory, setIsCreatingCategory] = useState(false)
   const [newCategoryName, setNewCategoryName] = useState('')
+
+  useEffect(() => {
+    if (open) {
+      setScope(defaultScope)
+      setDate(getLocalDateString())
+    }
+  }, [open, defaultScope])
 
   const availableCategories = categories && categories.length > 0 ? categories : DEFAULT_CATEGORIES
 
@@ -78,7 +95,7 @@ export function TransactionModal({
       <DialogHeader>
         <DialogTitle>Registrar Movimiento</DialogTitle>
         <DialogDescription>
-          Anota un nuevo ingreso o gasto para mantener tus cuentas al día.
+          Anota un nuevo ingreso o gasto y elige a cuál de las 2 cuentas corresponde.
         </DialogDescription>
       </DialogHeader>
 
@@ -91,10 +108,10 @@ export function TransactionModal({
               setType('expense')
               setCategory('')
             }}
-            className={`flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-semibold transition-transform duration-100 active:scale-95 select-none ${
+            className={`flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-semibold transition-all duration-100 active:scale-95 touch-manipulation select-none ${
               type === 'expense'
                 ? 'bg-[#991b1b] text-white shadow-sm'
-                : 'text-muted-foreground hover:text-foreground'
+                : 'text-muted-foreground active:bg-background/60'
             }`}
           >
             <ArrowDownRight className="h-4 w-4" />
@@ -104,16 +121,16 @@ export function TransactionModal({
             type="button"
             onClick={() => {
               setType('income')
-              setCategory('')
+              setCategory('Sueldo / Haberes')
             }}
-            className={`flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-semibold transition-transform duration-100 active:scale-95 select-none ${
+            className={`flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-semibold transition-all duration-100 active:scale-95 touch-manipulation select-none ${
               type === 'income'
                 ? 'bg-primary text-primary-foreground shadow-sm'
-                : 'text-muted-foreground hover:text-foreground'
+                : 'text-muted-foreground active:bg-primary/15 active:text-primary'
             }`}
           >
             <ArrowUpRight className="h-4 w-4" />
-            Ingreso / Cobro
+            Ingreso / Sueldo
           </button>
         </div>
 
@@ -139,35 +156,35 @@ export function TransactionModal({
           </div>
         </div>
 
-        {/* Ámbito: Negocio vs Personal */}
+        {/* Selección de Cuenta: Cuenta 1 (Vivi) vs Cuenta 2 (Papá) */}
         <div>
           <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block mb-1.5">
-            Destino o Ámbito
+            ¿A qué cuenta corresponde?
           </label>
           <div className="grid grid-cols-2 gap-2">
             <button
               type="button"
-              onClick={() => setScope('business')}
-              className={`flex items-center justify-center gap-2 p-2.5 rounded-xl border text-sm font-medium transition-transform duration-100 active:scale-95 select-none ${
-                scope === 'business'
-                  ? 'border-indigo-600 bg-indigo-50 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300 ring-2 ring-indigo-500/20'
-                  : 'border-border bg-card text-muted-foreground hover:bg-muted'
+              onClick={() => setScope('personal')}
+              className={`flex items-center justify-center gap-2 p-2.5 rounded-xl border text-xs sm:text-sm font-semibold transition-all duration-100 active:scale-95 touch-manipulation select-none text-center leading-tight ${
+                scope === 'personal'
+                  ? 'border-primary bg-primary text-primary-foreground shadow-sm ring-2 ring-primary/25'
+                  : 'border-border bg-card text-muted-foreground active:bg-primary/15'
               }`}
             >
-              <Briefcase className="h-4 w-4" />
-              Negocio / Trabajo
+              <span className="text-base leading-none shrink-0">{account1Emoji}</span>
+              <span className="truncate">{account1Name}</span>
             </button>
             <button
               type="button"
-              onClick={() => setScope('personal')}
-              className={`flex items-center justify-center gap-2 p-2.5 rounded-xl border text-sm font-medium transition-transform duration-100 active:scale-95 select-none ${
-                scope === 'personal'
-                  ? 'border-primary bg-primary/10 text-primary ring-2 ring-primary/20'
-                  : 'border-border bg-card text-muted-foreground hover:bg-muted'
+              onClick={() => setScope('business')}
+              className={`flex items-center justify-center gap-2 p-2.5 rounded-xl border text-xs sm:text-sm font-semibold transition-all duration-100 active:scale-95 touch-manipulation select-none text-center leading-tight ${
+                scope === 'business'
+                  ? 'border-primary bg-primary/15 text-primary ring-2 ring-primary/25 shadow-sm'
+                  : 'border-border bg-card text-muted-foreground active:bg-primary/15'
               }`}
             >
-              <User className="h-4 w-4" />
-              Personal
+              <span className="text-base leading-none shrink-0">{account2Emoji}</span>
+              <span className="truncate">{account2Name}</span>
             </button>
           </div>
         </div>
@@ -181,7 +198,7 @@ export function TransactionModal({
             <button
               type="button"
               onClick={() => setIsCreatingCategory(!isCreatingCategory)}
-              className="text-xs text-primary hover:underline flex items-center gap-1 font-medium"
+              className="text-xs px-2.5 py-0.5 rounded-full bg-primary/15 text-primary border border-primary/30 active:scale-95 active:bg-primary active:text-primary-foreground transition-all flex items-center gap-1 font-bold touch-manipulation select-none"
             >
               {isCreatingCategory ? (
                 <>
@@ -269,7 +286,7 @@ export function TransactionModal({
           </Button>
           <Button
             type="submit"
-            className={type === 'income' ? 'bg-primary hover:opacity-90 text-primary-foreground gap-1.5' : 'bg-[#991b1b] hover:bg-[#7f1d1d] text-white gap-1.5'}
+            className={type === 'income' ? 'bg-primary active:brightness-90 text-primary-foreground gap-1.5' : 'bg-[#991b1b] active:bg-[#7f1d1d] text-white gap-1.5'}
           >
             <PawPrint className="h-4 w-4" />
             Guardar {type === 'income' ? 'Ingreso' : 'Egreso'}

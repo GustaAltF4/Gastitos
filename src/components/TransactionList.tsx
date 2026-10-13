@@ -4,7 +4,7 @@ import { formatDate } from '../lib/utils'
 import { Card, CardHeader, CardTitle, CardContent } from './ui/card'
 import { Badge } from './ui/badge'
 import { CurrencyText } from './ui/currency-text'
-import { Trash2, Search, Briefcase, User, Cat } from 'lucide-react'
+import { Trash2, Search, Cat } from 'lucide-react'
 
 function HappyCatIcon({ className = 'h-7 w-7' }: { className?: string }) {
   return (
@@ -49,16 +49,30 @@ interface TransactionListProps {
   transactions: Transaction[]
   onDelete: (id: string) => void
   currency: string
+  account1Name?: string
+  account2Name?: string
+  account1Emoji?: string
+  account2Emoji?: string
 }
 
-export function TransactionList({ transactions, onDelete, currency }: TransactionListProps) {
+export function TransactionList({
+  transactions,
+  onDelete,
+  currency,
+  account1Name = 'Vivi',
+  account2Name = 'Papá',
+  account1Emoji = '👩',
+  account2Emoji = '👨',
+}: TransactionListProps) {
   const [searchTerm, setSearchTerm] = useState('')
   const [typeFilter, setTypeFilter] = useState<'all' | 'income' | 'expense'>('all')
 
   const filtered = transactions.filter((tx) => {
+    const accountLabel = tx.scope === 'business' ? account2Name : account1Name
     const matchesSearch =
       tx.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      tx.category.toLowerCase().includes(searchTerm.toLowerCase())
+      tx.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      accountLabel.toLowerCase().includes(searchTerm.toLowerCase())
     const matchesType = typeFilter === 'all' || tx.type === typeFilter
     return matchesSearch && matchesType
   })
@@ -68,7 +82,7 @@ export function TransactionList({ transactions, onDelete, currency }: Transactio
       <CardHeader className="pb-3">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <CardTitle className="text-base font-bold">
-            Movimientos ({transactions.length})
+            Movimientos ({filtered.length})
           </CardTitle>
 
           {/* Filtros rápidos adaptables sin comprimir el buscador */}
@@ -130,13 +144,13 @@ export function TransactionList({ transactions, onDelete, currency }: Transactio
               return (
                 <div
                   key={tx.id}
-                  className="py-3.5 flex items-start sm:items-center justify-between gap-2 sm:gap-3 group hover:bg-muted/30 px-1 sm:px-2 rounded-xl transition-all duration-100 active:scale-[0.99] hardware-accelerated"
+                  className="py-3.5 flex items-start sm:items-center justify-between gap-2 sm:gap-3 active:bg-primary/10 px-1.5 sm:px-2 rounded-xl transition-all duration-100 active:scale-[0.98] touch-manipulation hardware-accelerated"
                 >
                   <div className="flex items-start sm:items-center gap-2.5 sm:gap-3 min-w-0 flex-1">
                     <div
-                      className={`h-10 w-10 sm:h-12 sm:w-12 rounded-2xl shrink-0 flex items-center justify-center transition-transform active:scale-95 select-none shadow-xs mt-0.5 sm:mt-0 ${
+                      className={`h-10 w-10 sm:h-12 sm:w-12 rounded-2xl shrink-0 flex items-center justify-center transition-transform active:scale-90 select-none shadow-xs mt-0.5 sm:mt-0 ${
                         tx.type === 'income'
-                          ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/25'
+                          ? 'bg-primary/15 text-primary border border-primary/25'
                           : 'bg-red-950/20 text-[#991b1b] dark:text-red-400 border border-[#991b1b]/25'
                       }`}
                     >
@@ -160,15 +174,15 @@ export function TransactionList({ transactions, onDelete, currency }: Transactio
                       <div className="mt-1">
                         <Badge
                           variant={tx.scope === 'business' ? 'business' : 'personal'}
-                          className="text-[10px] py-0 px-1.5 font-normal shrink-0"
+                          className="text-[10px] py-0 px-1.5 font-medium shrink-0"
                         >
                           {tx.scope === 'business' ? (
-                            <span className="flex items-center gap-0.5">
-                              <Briefcase className="h-2.5 w-2.5 shrink-0" /> Negocio
+                            <span className="flex items-center gap-1">
+                              <span>{account2Emoji}</span> {account2Name}
                             </span>
                           ) : (
-                            <span className="flex items-center gap-0.5">
-                              <User className="h-2.5 w-2.5 shrink-0" /> Personal
+                            <span className="flex items-center gap-1">
+                              <span>{account1Emoji}</span> {account1Name}
                             </span>
                           )}
                         </Badge>
@@ -191,7 +205,7 @@ export function TransactionList({ transactions, onDelete, currency }: Transactio
 
                     <button
                       onClick={() => onDelete(tx.id)}
-                      className="h-8 w-8 sm:h-9 sm:w-9 rounded-xl flex items-center justify-center text-rose-600 dark:text-rose-400 bg-rose-500/10 hover:bg-rose-500/20 active:bg-rose-500/30 border border-rose-500/25 active:scale-90 transition-all select-none shrink-0"
+                      className="h-8 w-8 sm:h-9 sm:w-9 rounded-xl flex items-center justify-center text-rose-600 dark:text-rose-400 bg-rose-500/12 active:bg-rose-600 active:text-white border border-rose-500/30 active:scale-90 transition-all select-none shrink-0 touch-manipulation shadow-2xs"
                       title="Eliminar este movimiento"
                       aria-label="Eliminar movimiento"
                     >
