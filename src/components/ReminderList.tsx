@@ -1,5 +1,6 @@
 import { Reminder } from '../types/finance'
-import { formatCurrency, formatDateTime } from '../lib/utils'
+import { formatDateTime } from '../lib/utils'
+import { CurrencyText } from './ui/currency-text'
 import { Card, CardHeader, CardTitle, CardContent } from './ui/card'
 import { Badge } from './ui/badge'
 import { Button } from './ui/button'
@@ -90,7 +91,7 @@ export function ReminderList({
         </div>
       </CardHeader>
 
-      <CardContent>
+      <CardContent className="px-3 sm:px-6">
         {sorted.length === 0 ? (
           <div className="py-12 px-4 text-center flex flex-col items-center justify-center">
             <div className="h-12 w-12 rounded-2xl bg-amber-500/10 text-amber-500 flex items-center justify-center mb-3">
@@ -116,7 +117,7 @@ export function ReminderList({
               return (
                 <div
                   key={rem.id}
-                  className={`py-3.5 flex items-start sm:items-center justify-between gap-3 group px-2 rounded-xl transition-colors ${
+                  className={`py-3.5 flex items-start sm:items-center justify-between gap-2 sm:gap-3 group px-1 sm:px-2 rounded-xl transition-colors ${
                     rem.status === 'completed'
                       ? 'opacity-60 bg-muted/20'
                       : isOverdue
@@ -126,10 +127,10 @@ export function ReminderList({
                       : 'hover:bg-muted/30'
                   }`}
                 >
-                  <div className="flex items-start gap-3 min-w-0">
+                  <div className="flex items-start gap-2.5 sm:gap-3 min-w-0 flex-1">
                     <button
                       onClick={() => handleMarkComplete(rem.id)}
-                      className={`mt-0.5 sm:mt-0 p-1 rounded-full transition-colors ${
+                      className={`mt-0.5 sm:mt-0 p-1 rounded-full shrink-0 transition-colors ${
                         rem.status === 'completed'
                           ? 'text-primary bg-primary/10'
                           : 'text-muted-foreground hover:text-primary hover:bg-primary/10'
@@ -143,18 +144,18 @@ export function ReminderList({
                       />
                     </button>
 
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <p
-                          className={`font-semibold text-sm ${
-                            rem.status === 'completed'
-                              ? 'line-through text-muted-foreground'
-                              : 'text-foreground'
-                          }`}
-                        >
-                          {rem.title}
-                        </p>
+                    <div className="min-w-0 flex-1">
+                      <p
+                        className={`font-semibold text-sm break-words leading-snug ${
+                          rem.status === 'completed'
+                            ? 'line-through text-muted-foreground'
+                            : 'text-foreground'
+                        }`}
+                      >
+                        {rem.title}
+                      </p>
 
+                      <div className="flex items-center gap-1.5 mt-1 flex-wrap">
                         {isOverdue && (
                           <Badge variant="destructive" className="text-[10px] py-0 px-1.5 flex items-center gap-0.5">
                             <AlertTriangle className="h-2.5 w-2.5" /> Vencido
@@ -183,31 +184,31 @@ export function ReminderList({
                         </Badge>
                       </div>
 
-                      <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground flex-wrap">
-                        <span className="flex items-center gap-1 font-medium">
-                          <Clock className="h-3 w-3 text-muted-foreground" />
+                      <p className="mt-1 text-xs text-muted-foreground leading-snug">
+                        <span className="inline-flex items-center gap-1 font-medium whitespace-nowrap">
+                          <Clock className="h-3 w-3 text-muted-foreground shrink-0 inline" />
                           {formatDateTime(rem.dueDateTime)} hs
                         </span>
                         {rem.notes && (
-                          <>
-                            <span>•</span>
-                            <span className="truncate max-w-[200px] sm:max-w-xs">{rem.notes}</span>
-                          </>
+                          <span className="break-words"> • {rem.notes}</span>
                         )}
-                      </div>
+                      </p>
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-3 shrink-0">
+                  <div className="flex items-center justify-end gap-1.5 sm:gap-2.5 shrink-0 max-w-[44%] sm:max-w-[48%] min-w-0 pt-0.5 sm:pt-0">
                     {rem.amount ? (
-                      <span className="font-bold text-sm sm:text-base text-foreground">
-                        {formatCurrency(rem.amount, currency)}
-                      </span>
+                      <CurrencyText
+                        amount={rem.amount}
+                        currency={currency}
+                        autoFit={true}
+                        className="font-bold text-sm sm:text-base text-foreground text-right"
+                      />
                     ) : null}
 
                     <button
                       onClick={() => onDelete(rem.id)}
-                      className="h-9 w-9 rounded-xl flex items-center justify-center text-rose-600 dark:text-rose-400 bg-rose-500/10 hover:bg-rose-500/20 active:bg-rose-500/30 border border-rose-500/25 active:scale-90 transition-all select-none shrink-0"
+                      className="h-8 w-8 sm:h-9 sm:w-9 rounded-xl flex items-center justify-center text-rose-600 dark:text-rose-400 bg-rose-500/10 hover:bg-rose-500/20 active:bg-rose-500/30 border border-rose-500/25 active:scale-90 transition-all select-none shrink-0"
                       title="Eliminar este recordatorio"
                       aria-label="Eliminar recordatorio"
                     >

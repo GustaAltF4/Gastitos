@@ -5,15 +5,46 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
+export interface CurrencyParts {
+  symbol: string
+  integer: string
+  cents: string
+  isNegative: boolean
+}
+
+export function formatCurrencyParts(amount: number, currency: string = "ARS"): CurrencyParts {
+  const safeAmount = Number.isFinite(amount) ? amount : 0
+  const isNegative = safeAmount < 0
+  const absCents = Math.round(Math.abs(safeAmount) * 100)
+  const integerPart = Math.floor(absCents / 100)
+  const centsPart = String(absCents % 100).padStart(2, "0")
+
+  let symbol = "$"
+  if (currency === "USD") symbol = "US$"
+  else if (currency === "EUR") symbol = "€"
+  else if (currency === "BRL") symbol = "R$"
+
+  const integerFormatted = integerPart.toLocaleString("es-AR")
+
+  return {
+    symbol,
+    integer: integerFormatted,
+    cents: centsPart,
+    isNegative,
+  }
+}
+
 export function formatCurrency(amount: number, currency: string = "ARS"): string {
   try {
     return new Intl.NumberFormat("es-AR", {
       style: "currency",
       currency: currency,
-      maximumFractionDigits: 0,
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
     }).format(amount)
   } catch {
-    return `$ ${amount.toLocaleString("es-AR")}`
+    const { symbol, integer, cents, isNegative } = formatCurrencyParts(amount, currency)
+    return `${isNegative ? "-" : ""}${symbol} ${integer},${cents}`
   }
 }
 

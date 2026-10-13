@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useMemo } from 'react'
 import { TattooAppointment, TattooReminderOption } from '../types/finance'
-import { formatCurrency, getLocalDateString } from '../lib/utils'
+import { getLocalDateString } from '../lib/utils'
+import { CurrencyText } from './ui/currency-text'
 import { Card, CardHeader, CardTitle, CardContent } from './ui/card'
 import { Button } from './ui/button'
 import {
@@ -178,11 +179,14 @@ export function TattooCalendar({
               <span className="text-[10px] font-semibold text-muted-foreground block">Turnos Agendados</span>
               <span className="text-base sm:text-lg font-black text-foreground">{totalAppointments}</span>
             </div>
-            <div className="text-center sm:text-left border-l border-border/60 pl-3">
+            <div className="text-center sm:text-left border-l border-border/60 pl-3 min-w-0 overflow-hidden">
               <span className="text-[10px] font-semibold text-muted-foreground block">Total en Señas</span>
-              <span className="text-base sm:text-lg font-black text-primary">
-                {formatCurrency(totalDeposits, currency)}
-              </span>
+              <CurrencyText
+                amount={totalDeposits}
+                currency={currency}
+                autoFit={true}
+                className="text-base sm:text-lg font-black text-primary"
+              />
             </div>
           </div>
 
@@ -360,19 +364,24 @@ export function TattooCalendar({
                           </div>
 
                           {/* Nombre del Cliente */}
-                          <div>
-                            <p className="font-bold text-sm text-foreground leading-snug">
+                          <div className="min-w-0">
+                            <p className="font-bold text-sm text-foreground break-words leading-snug">
                               {appt.clientName}
                             </p>
                           </div>
 
                           {/* Seña abonada si existe */}
                           {appt.deposit ? (
-                            <div className="pt-1 border-t border-border/60 flex items-center justify-between text-xs">
-                              <span className="text-[11px] text-muted-foreground font-medium">Seña:</span>
-                              <span className="font-black text-primary">
-                                {formatCurrency(appt.deposit, currency)}
-                              </span>
+                            <div className="pt-1 border-t border-border/60 flex items-center justify-between gap-2 text-xs min-w-0">
+                              <span className="text-[11px] text-muted-foreground font-medium shrink-0">Seña:</span>
+                              <div className="min-w-0 flex-1 text-right">
+                                <CurrencyText
+                                  amount={appt.deposit}
+                                  currency={currency}
+                                  autoFit={true}
+                                  className="font-black text-primary text-right"
+                                />
+                              </div>
                             </div>
                           ) : null}
 

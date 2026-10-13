@@ -2,6 +2,10 @@ import { LocalNotifications } from '@capacitor/local-notifications'
 import { Reminder, TattooAppointment, TattooReminderOption } from '../types/finance'
 import { formatCurrency } from '../lib/utils'
 
+const DEFAULT_VAPID_PUBLIC_KEY =
+  'BK1IvkCefscA36nPs2gy5Dw2q8UmCouJbBzSPjsuwz0n6Be-EPmg98PNlO-hoo4w02pCeF_5_FKt5Crqlx_SPnY'
+const QSTASH_MAP_STORAGE_KEY = 'gastitos_qstash_msg_map_v1'
+
 export interface NotificationErrorInfo {
   code: string
   context: string
@@ -67,6 +71,154 @@ if (typeof window !== 'undefined') {
       reportNotificationError('ERR-GLOBAL-NOTIF', 'Timer asíncrono de notificación', event.error || msg)
     }
   })
+}
+
+function urlBase64ToUint8Array(base64String: string): Uint8Array {
+  const padding = '='.repeat((4 - (base64String.length % 4)) % 4)
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/')
+  const rawData = window.atob(base64)
+  const outputArray = new Uint8Array(rawData.length)
+  for (let i = 0; i < rawData.length; ++i) {
+    outputArray[i] = rawData.charCodeAt(i)
+  }
+  return outputArray
+}
+
+function getQstashMap(): Record<string, string> {
+  try {
+    const raw = localStorage.getItem(QSTASH_MAP_STORAGE_KEY)
+    return raw ? JSON.parse(raw) : {}
+  } catch {
+    return {}
+  }
+}
+
+function saveQstashMessageId(notificationId: number, messageId: string): void {
+  try {
+    const map = getQstashMap()
+    map[String(notificationId)] = messageId
+    localStorage.setItem(QSTASH_MAP_STORAGE_KEY, JSON.stringify(map))
+  } catch {}
+}
+
+function popQstashMessageId(notificationId: number): string | undefined {
+  try {
+    const map = getQstashMap()
+    const msgId = map[String(notificationId)]
+    if (msgId) {
+      delete map[String(notificationId)]
+      localStorage.setItem(QSTASH_MAP_STORAGE_KEY, JSON.stringify(map))
+    }
+    return msgId
+  } catch {
+    return undefined
+  }
+}
+
+// Obtener o crear la suscripción Web Push del Service Worker (iOS 16.4+ PWA / Android)
+async function getOrCreatePushSubscription(): Promise<PushSubscription | null> {
+  if (typeof window === 'undefined' || !('serviceWorker' in navigator) || !('PushManager' in window)) {
+    return null
+  }
+
+  try {
+    const registration = await navigator.serviceWorker.ready
+    let subscription = await registration.pushManager.getSubscription()
+
+    if (!subscription) {
+      const vapidPublicKey =
+        (import.meta as unknown as { env?: Record<string, string> }).env?.VITE_VAPID_PUBLIC_KEY ||
+        DEFAULT_VAPID_PUBLIC_KEY
+      const convertedVapidKey = urlBase64ToUint8Array(vapidPublicKey)
+
+      subscription = await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: convertedVapidKey as unknown as BufferSource,
+      })
+    }
+
+    return subscription
+  } catch (err) {
+    reportNotificationError('ERR-PUSH-SUB', 'Suscribir PushManager (iOS/PWA)', err)
+    return null
+  }
+}
+
+// Enviar programación de Push en segundo plano a la función de Netlify + QStash
+async function scheduleRemoteWebPush(params: {
+  notificationId: number
+  title: string
+  body: string
+  fireAt?: number
+  delaySeconds?: number
+  tag?: string
+}): Promise<boolean> {
+  const subscription = await getOrCreatePushSubscription()
+  if (!subscription) return false
+
+  try {
+    const response = await fetch('/.netlify/functions/schedule-push', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        subscription: subscription.toJSON(),
+        title: params.title,
+        body: params.body,
+        fireAt: params.fireAt,
+        delaySeconds: params.delaySeconds,
+        tag: params.tag || String(params.notificationId),
+        url: '/',
+      }),
+    })
+
+    const data = await response.json().catch(() => ({}))
+    if (!response.ok) {
+      reportNotificationError(
+        data.code || 'ERR-NETLIFY-PUSH',
+        'Programar Web Push en Netlify/QStash',
+        new Error(data.error || `HTTP ${response.status}`)
+      )
+      return false
+    }
+
+    if (data.messageId && params.notificationId) {
+      saveQstashMessageId(params.notificationId, data.messageId)
+    }
+
+    return true
+  } catch (err) {
+    // Si está corriendo en localhost sin `netlify dev`, no bloquear las notificaciones locales
+    if (typeof window !== 'undefined' && window.location.hostname !== 'localhost') {
+      reportNotificationError('ERR-PUSH-NETWORK', 'Conectar con /.netlify/functions/schedule-push', err)
+    }
+    return false
+  }
+}
+
+// Mostrar notificación a través del Service Worker (estándar requerido por iOS PWA)
+async function showViaServiceWorkerOrWindow(title: string, body: string, tag: string): Promise<void> {
+  if ('serviceWorker' in navigator) {
+    try {
+      const reg = await navigator.serviceWorker.ready
+      if (reg && 'showNotification' in reg) {
+        await reg.showNotification(title, {
+          body,
+          icon: '/pwa-192x192.png',
+          badge: '/apple-touch-icon.png',
+          tag,
+        })
+        return
+      }
+    } catch {}
+  }
+
+  if ('Notification' in window && Notification.permission === 'granted') {
+    new Notification(title, {
+      body,
+      icon: '/pwa-192x192.png',
+      tag,
+    })
+  }
 }
 
 // Helper para parsear fecha y hora local de forma 100% segura en iOS WebKit / Safari
@@ -185,53 +337,50 @@ export const notificationService = {
     }
   },
 
-  // Solicitar permisos de notificación (Android 13+ y iOS requieren permiso explícito)
+  // Solicitar permisos de notificación y registrar suscripción Web Push para iOS/PWA
   async requestPermission(): Promise<boolean> {
     try {
+      if ('Notification' in window) {
+        const perm =
+          Notification.permission === 'granted' ? 'granted' : await Notification.requestPermission()
+
+        if (perm !== 'granted') {
+          reportNotificationError(
+            'ERR-PERM-01',
+            'Solicitar permiso de Notificaciones',
+            new Error(`El permiso no fue concedido. Estado actual: "${perm}"`)
+          )
+          return false
+        }
+
+        // Asegurar suscripción Web Push del Service Worker para que funcione con pantalla bloqueada
+        await getOrCreatePushSubscription()
+        return true
+      }
+
       const status = await LocalNotifications.requestPermissions()
       if (status.display !== 'granted') {
         reportNotificationError(
-          'ERR-PERM-01',
+          'ERR-PERM-02',
           'Solicitar permiso (LocalNotifications)',
           new Error(`El permiso no fue concedido. Estado actual: "${status.display}"`)
         )
       }
       return status.display === 'granted'
-    } catch (capErr) {
-      // Fallback para navegador web estándar si no está corriendo en Android/iOS nativo
-      if ('Notification' in window) {
-        try {
-          const perm = await Notification.requestPermission()
-          if (perm !== 'granted') {
-            reportNotificationError(
-              'ERR-PERM-02',
-              'Solicitar permiso (Notification API)',
-              new Error(`El permiso de notificaciones está en estado: "${perm}"`)
-            )
-          }
-          return perm === 'granted'
-        } catch (webErr) {
-          reportNotificationError('ERR-PERM-03', 'Fallo al pedir Notification.requestPermission()', webErr)
-          return false
-        }
-      } else {
-        reportNotificationError(
-          'ERR-NO-API-01',
-          'API Notification no disponible en este navegador/modo',
-          capErr
-        )
-      }
+    } catch (err) {
+      reportNotificationError('ERR-PERM-03', 'Fallo al pedir permisos de notificación', err)
       return false
     }
   },
 
-  // Programar un recordatorio normal (versión 1 original con captura de errores)
+  // Programar un recordatorio normal (Web Push en segundo plano + respaldo local)
   async scheduleReminderNotification(reminder: Reminder, currency: string = 'ARS'): Promise<number> {
     const targetDate = new Date(reminder.dueDateTime)
     const now = new Date()
     const id = reminder.notificationId || Math.floor(Math.random() * 100000)
 
     const amountText = reminder.amount ? ` - Monto: ${formatCurrency(reminder.amount, currency)}` : ''
+    const title = `🔔 ${reminder.title}`
     const body = `${reminder.notes || 'Recordatorio de pago pendiente'}${amountText}`
 
     // Si la fecha ya pasó, no programar en el pasado
@@ -240,83 +389,67 @@ export const notificationService = {
     }
 
     await this.initChannels()
-    await this.requestPermission()
+    const hasPerm = await this.requestPermission()
+    if (!hasPerm) return id
 
-    try {
-      await LocalNotifications.schedule({
-        notifications: [
-          {
-            title: `🔔 ${reminder.title}`,
-            body: body,
-            id: id,
-            channelId: 'gastos_reminders_channel',
-            schedule: {
-              at: targetDate,
-              allowWhileIdle: true,
-            },
-            sound: 'beep.wav',
-            actionTypeId: '',
-            extra: {
-              reminderId: reminder.id,
-            },
-          },
-        ],
-      })
-    } catch (error) {
-      console.warn('Capacitor LocalNotifications no disponible en este entorno, usando fallback web', error)
+    // 1. Programar Web Push diferido (QStash + Netlify Function) para despertar el iPhone bloqueado/cerrado
+    const pushScheduled = await scheduleRemoteWebPush({
+      notificationId: id,
+      title,
+      body,
+      fireAt: targetDate.getTime(),
+      tag: `rem-${reminder.id}`,
+    })
 
+    // 2. Si no se usó Web Push remoto (ej. entorno local), programar timer local de respaldo
+    if (!pushScheduled) {
       const delayMs = targetDate.getTime() - now.getTime()
       if (delayMs > 0 && delayMs < 7 * 24 * 60 * 60 * 1000) {
         setTimeout(() => {
-          try {
-            playChimeSound()
-            if (!('Notification' in window)) {
-              reportNotificationError(
-                'ERR-REM-NO-API',
-                'Disparo de Recordatorio (Fallback Web)',
-                new Error('window.Notification no existe en este navegador')
-              )
-              return
-            }
-            if (Notification.permission !== 'granted') {
-              reportNotificationError(
-                'ERR-REM-PERM',
-                'Disparo de Recordatorio (Fallback Web)',
-                new Error(`Permiso denegado o sin conceder (${Notification.permission})`)
-              )
-              return
-            }
-            new Notification(`🔔 ${reminder.title}`, {
-              body: body,
-              icon: '/favicon.ico',
-            })
-          } catch (fallbackErr) {
-            reportNotificationError('ERR-REM-FALLBACK', 'new Notification() en Recordatorio', fallbackErr)
-          }
+          playChimeSound()
+          showViaServiceWorkerOrWindow(title, body, `rem-${reminder.id}`).catch((fallbackErr) => {
+            reportNotificationError('ERR-REM-FALLBACK', 'Mostrar Recordatorio Local', fallbackErr)
+          })
         }, delayMs)
-      } else {
-        reportNotificationError('ERR-REM-SCHEDULE', 'Programar Recordatorio', error)
+      }
+    } else {
+      // Aun con Web Push activo, dejar chime sonoro por si tiene la app abierta en ese instante
+      const delayMs = targetDate.getTime() - now.getTime()
+      if (delayMs > 0 && delayMs < 24 * 60 * 60 * 1000) {
+        setTimeout(() => {
+          playChimeSound()
+        }, delayMs)
       }
     }
 
     return id
   },
 
-  // Cancelar una notificación programada
+  // Cancelar una notificación programada (tanto en QStash como local)
   async cancelNotification(notificationId: number): Promise<void> {
     if (!notificationId) return
+
+    const qstashMsgId = popQstashMessageId(notificationId)
+    if (qstashMsgId) {
+      try {
+        await fetch('/.netlify/functions/schedule-push', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ messageId: qstashMsgId }),
+        })
+      } catch {}
+    }
+
     try {
       await LocalNotifications.cancel({
         notifications: [{ id: notificationId }],
       })
-    } catch (e) {
-      console.warn('No se pudo cancelar la notificación nativa', e)
-    }
+    } catch {}
   },
 
-  // Disparar una notificación de prueba inmediata con sonido audible y vibración
+  // Disparar una notificación de prueba inmediata + prueba de pantalla bloqueada a los 5 segundos
   async triggerTestNotification(): Promise<void> {
-    // 1. Sonido acústico y vibración inmediata asegurada
+    // 1. Sonido acústico y vibración inmediata
     playChimeSound()
     if ('vibrate' in navigator) {
       try {
@@ -324,53 +457,32 @@ export const notificationService = {
       } catch {}
     }
 
-    // 2. Notificación en el sistema móvil o navegador (misma lógica versión 1)
+    await this.initChannels()
+    const hasPermission = await this.requestPermission()
+    if (!hasPermission) return
+
+    // 2. Mostrar notificación inmediata por Service Worker
     try {
-      await this.initChannels()
-      const hasPermission = await this.requestPermission()
-      if (hasPermission) {
-        await LocalNotifications.schedule({
-          notifications: [
-            {
-              title: '🔔 ¡Prueba de Alerta Exitosa!',
-              body: 'Tus recordatorios y avisos de pago sonarán en tu celular en la fecha y hora que elijas.',
-              id: 9999,
-              channelId: 'gastos_reminders_channel',
-              schedule: { at: new Date(Date.now() + 1000) },
-              sound: 'beep.wav',
-            },
-          ],
-        })
-      }
-    } catch (scheduleErr) {
-      try {
-        if (!('Notification' in window)) {
-          reportNotificationError(
-            'ERR-TEST-NO-API',
-            'Probar Notificación',
-            scheduleErr
-          )
-          return
-        }
-        if (Notification.permission !== 'granted') {
-          reportNotificationError(
-            'ERR-TEST-PERM',
-            'Probar Notificación (Sin permiso)',
-            new Error(`Estado del permiso: ${Notification.permission}`)
-          )
-          return
-        }
-        new Notification('🔔 ¡Prueba de Alerta Exitosa!', {
-          body: 'Tus recordatorios y avisos de pago sonarán en tu celular en la fecha y hora que elijas.',
-          icon: '/favicon.ico',
-        })
-      } catch (fallbackErr) {
-        reportNotificationError('ERR-TEST-FALLBACK', 'Probar Notificación (new Notification)', fallbackErr)
-      }
+      await showViaServiceWorkerOrWindow(
+        '🔔 ¡Prueba de Alerta Activa!',
+        'Bloquea la pantalla ahora: en 5 segundos te llegará otra alerta de prueba con el celu bloqueado.',
+        'gastitos-test-immediate'
+      )
+    } catch (err) {
+      reportNotificationError('ERR-TEST-SW', 'Mostrar Notificación de Prueba', err)
     }
+
+    // 3. Programar un Web Push real a 5 segundos para que pueda bloquear el iPhone y comprobar que llega bloqueado
+    await scheduleRemoteWebPush({
+      notificationId: 9999,
+      title: '🔒 ¡Llegó con Pantalla Bloqueada! 🐾',
+      body: 'Tus avisos de Tattoo y Recordatorios ya suenan aunque la app esté cerrada o el iPhone bloqueado.',
+      delaySeconds: 5,
+      tag: 'gastitos-test-locked',
+    })
   },
 
-  // Programar notificaciones para turno de Tattoo (copia exacta de la lógica de recordatorios versión 1)
+  // Programar notificaciones para turno de Tattoo (Web Push en segundo plano + respaldo local)
   async scheduleTattooNotifications(appointment: TattooAppointment): Promise<number[]> {
     const options = appointment.reminderOptions || (appointment.reminderOption ? [appointment.reminderOption] : [])
     const activeOptions = options.filter((o) => o !== 'none')
@@ -381,7 +493,8 @@ export const notificationService = {
     const now = new Date()
 
     await this.initChannels()
-    await this.requestPermission()
+    const hasPerm = await this.requestPermission()
+    if (!hasPerm) return []
 
     for (const opt of activeOptions) {
       const alertDate = calculateTattooAlertDate(appointment.date, appointment.time, opt)
@@ -396,66 +509,38 @@ export const notificationService = {
       else if (opt === '10_min_before') label = 'En 10 minutos comienza el turno'
       else label = 'Turno ahora'
 
+      const title = `🖋️ Agenda Tattoo: ${appointment.clientName}`
       const body = `${label} con ${appointment.clientName} a las ${appointment.time} hs`
+      const tag = `tattoo-${appointment.id}-${opt}`
 
-      try {
-        await LocalNotifications.schedule({
-          notifications: [
-            {
-              title: `🖋️ Agenda Tattoo: ${appointment.clientName}`,
-              body: body,
-              id: id,
-              channelId: 'gastos_reminders_channel',
-              schedule: {
-                at: alertDate,
-                allowWhileIdle: true,
-              },
-              sound: 'beep.wav',
-              actionTypeId: '',
-              extra: {
-                tattooId: appointment.id,
-              },
-            },
-          ],
-        })
-        scheduledIds.push(id)
-      } catch (error) {
-        console.warn('Capacitor LocalNotifications fallback web para tattoo', error)
+      const pushScheduled = await scheduleRemoteWebPush({
+        notificationId: id,
+        title,
+        body,
+        fireAt: alertDate.getTime(),
+        tag,
+      })
 
+      if (!pushScheduled) {
         const delayMs = alertDate.getTime() - now.getTime()
         if (delayMs > 0 && delayMs < 7 * 24 * 60 * 60 * 1000) {
           setTimeout(() => {
-            try {
-              playChimeSound()
-              if (!('Notification' in window)) {
-                reportNotificationError(
-                  'ERR-TATTOO-NO-API',
-                  'Disparo Alerta Tattoo (Fallback Web)',
-                  new Error('window.Notification no existe en este navegador')
-                )
-                return
-              }
-              if (Notification.permission !== 'granted') {
-                reportNotificationError(
-                  'ERR-TATTOO-PERM',
-                  'Disparo Alerta Tattoo (Fallback Web)',
-                  new Error(`Permiso denegado o sin conceder (${Notification.permission})`)
-                )
-                return
-              }
-              new Notification(`🖋️ Agenda Tattoo: ${appointment.clientName}`, {
-                body: body,
-                icon: '/favicon.ico',
-              })
-            } catch (fallbackErr) {
-              reportNotificationError('ERR-TATTOO-FALLBACK', 'new Notification() en Agenda Tattoo', fallbackErr)
-            }
+            playChimeSound()
+            showViaServiceWorkerOrWindow(title, body, tag).catch((fallbackErr) => {
+              reportNotificationError('ERR-TATTOO-FALLBACK', 'Mostrar Alerta Tattoo Local', fallbackErr)
+            })
           }, delayMs)
-          scheduledIds.push(id)
-        } else {
-          reportNotificationError('ERR-TATTOO-SCHEDULE', 'Programar Alerta Tattoo', error)
+        }
+      } else {
+        const delayMs = alertDate.getTime() - now.getTime()
+        if (delayMs > 0 && delayMs < 24 * 60 * 60 * 1000) {
+          setTimeout(() => {
+            playChimeSound()
+          }, delayMs)
         }
       }
+
+      scheduledIds.push(id)
     }
 
     return scheduledIds

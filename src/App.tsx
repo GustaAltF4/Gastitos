@@ -337,7 +337,12 @@ export function App() {
   const pendingRemindersCount = reminders.filter((r) => r.status === 'pending').length
 
   return (
-    <div className="min-h-screen bg-background text-foreground flex flex-col pb-28 sm:pb-32">
+    <div
+      className="min-h-screen bg-background text-foreground flex flex-col sm:pb-32"
+      style={{
+        paddingBottom: 'calc(6.5rem + max(env(safe-area-inset-bottom, 0px), var(--safe-area-inset-bottom, 0px)))',
+      }}
+    >
       {/* Barra superior limpia */}
       <Header
         darkMode={config.darkMode}

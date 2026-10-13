@@ -1,8 +1,8 @@
 import { ArrowDownRight, ArrowUpRight, ChevronLeft, ChevronRight, Briefcase, User, Sparkles } from "lucide-react"
 import { AnimatedCounter } from "./react-bits/AnimatedCounter"
 import { GlowCard } from "./react-bits/GlowCard"
+import { CurrencyText } from "./ui/currency-text"
 import { TransactionScope } from "../types/finance"
-import { formatCurrency } from "../lib/utils"
 
 interface BalanceCardProps {
   currentMonth: Date
@@ -62,10 +62,10 @@ export function BalanceCard({
         </div>
 
         {/* Filtro Ámbito: Todos | Negocio | Personal */}
-        <div className="flex items-center bg-muted/70 p-1 rounded-xl w-full sm:w-auto justify-center text-xs">
+        <div className="grid grid-cols-3 sm:flex items-center bg-muted/70 p-1 rounded-xl w-full sm:w-auto text-xs gap-1">
           <button
             onClick={() => onScopeChange('all')}
-            className={`px-3 py-1.5 rounded-lg font-medium transition-all ${
+            className={`px-2 sm:px-3 py-1.5 rounded-lg font-medium transition-all text-center whitespace-nowrap ${
               scopeFilter === 'all'
                 ? 'bg-card text-foreground shadow-sm'
                 : 'text-muted-foreground hover:text-foreground'
@@ -75,25 +75,25 @@ export function BalanceCard({
           </button>
           <button
             onClick={() => onScopeChange('business')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-medium transition-all ${
+            className={`flex items-center justify-center gap-1 px-2 sm:px-3 py-1.5 rounded-lg font-medium transition-all whitespace-nowrap ${
               scopeFilter === 'business'
                 ? 'bg-indigo-600 text-white shadow-sm'
                 : 'text-muted-foreground hover:text-foreground'
             }`}
           >
-            <Briefcase className="h-3.5 w-3.5" />
-            Negocio / Freelance
+            <Briefcase className="h-3.5 w-3.5 shrink-0" />
+            <span>Negocio</span>
           </button>
           <button
             onClick={() => onScopeChange('personal')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-medium transition-all ${
+            className={`flex items-center justify-center gap-1 px-2 sm:px-3 py-1.5 rounded-lg font-medium transition-all whitespace-nowrap ${
               scopeFilter === 'personal'
                 ? 'bg-primary text-primary-foreground shadow-sm'
                 : 'text-muted-foreground hover:text-foreground'
             }`}
           >
-            <User className="h-3.5 w-3.5" />
-            Personal
+            <User className="h-3.5 w-3.5 shrink-0" />
+            <span>Personal</span>
           </button>
         </div>
       </div>
@@ -103,25 +103,25 @@ export function BalanceCard({
         glowColor={balance >= 0 ? "hsl(var(--primary) / 0.25)" : "rgba(239, 68, 68, 0.2)"}
         className="bg-gradient-to-br from-card via-card to-muted/30 border border-border/80"
       >
-        <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center justify-between gap-2 mb-2">
           <span className="text-xs sm:text-sm font-medium text-muted-foreground tracking-wide uppercase">
             {scopeFilter === 'business' ? 'Ganancia Neta (Negocio)' : scopeFilter === 'personal' ? 'Saldo Libre (Personal)' : 'Balance Neto Total'}
           </span>
           {totalIncome > 0 && (
             <span
-              className={`inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full ${
+              className={`inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full shrink-0 ${
                 savingsRate >= 0
                   ? 'bg-primary/15 text-primary'
                   : 'bg-rose-500/15 text-rose-600 dark:text-rose-400'
               }`}
             >
-              <Sparkles className="h-3 w-3" />
+              <Sparkles className="h-3 w-3 shrink-0" />
               {savingsRate}% margen
             </span>
           )}
         </div>
 
-        <div className="flex items-baseline gap-2 mb-6">
+        <div className="flex items-baseline gap-2 mb-6 min-w-0">
           <AnimatedCounter
             value={balance}
             currency={currency}
@@ -132,33 +132,41 @@ export function BalanceCard({
         </div>
 
         {/* Resumen Ingresos vs Egresos */}
-        <div className="grid grid-cols-2 gap-3 pt-4 border-t border-border/60">
-          <div className="bg-primary/10 p-3 sm:p-4 rounded-xl border border-primary/20">
+        <div className="grid grid-cols-2 gap-2.5 sm:gap-3 pt-4 border-t border-border/60">
+          <div className="bg-primary/10 p-3 sm:p-4 rounded-xl border border-primary/20 min-w-0 overflow-hidden">
             <div className="flex items-center gap-2 mb-1">
-              <div className="p-1 rounded-full bg-primary text-primary-foreground">
+              <div className="p-1 rounded-full bg-primary text-primary-foreground shrink-0">
                 <ArrowUpRight className="h-3.5 w-3.5" />
               </div>
               <span className="text-xs font-semibold text-primary">
                 Ingresos
               </span>
             </div>
-            <p className="text-lg sm:text-xl font-bold text-primary">
-              +{formatCurrency(totalIncome, currency)}
-            </p>
+            <CurrencyText
+              amount={totalIncome}
+              currency={currency}
+              sign="plus"
+              autoFit={true}
+              className="text-lg sm:text-xl font-bold text-primary"
+            />
           </div>
 
-          <div className="bg-red-950/10 dark:bg-red-950/30 p-3 sm:p-4 rounded-xl border border-red-900/20 dark:border-red-900/40">
+          <div className="bg-red-950/10 dark:bg-red-950/30 p-3 sm:p-4 rounded-xl border border-red-900/20 dark:border-red-900/40 min-w-0 overflow-hidden">
             <div className="flex items-center gap-2 mb-1">
-              <div className="p-1 rounded-full bg-[#991b1b] text-white">
+              <div className="p-1 rounded-full bg-[#991b1b] text-white shrink-0">
                 <ArrowDownRight className="h-3.5 w-3.5" />
               </div>
               <span className="text-xs font-semibold text-[#991b1b] dark:text-red-400">
                 Egresos
               </span>
             </div>
-            <p className="text-lg sm:text-xl font-bold text-[#991b1b] dark:text-red-400">
-              -{formatCurrency(totalExpense, currency)}
-            </p>
+            <CurrencyText
+              amount={totalExpense}
+              currency={currency}
+              sign="minus"
+              autoFit={true}
+              className="text-lg sm:text-xl font-bold text-[#991b1b] dark:text-red-400"
+            />
           </div>
         </div>
       </GlowCard>

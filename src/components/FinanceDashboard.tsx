@@ -17,6 +17,7 @@ import {
 import { Transaction } from '../types/finance'
 import { ThemeColor } from '../services/storage'
 import { formatCurrency } from '../lib/utils'
+import { CurrencyText } from './ui/currency-text'
 import { Card, CardHeader, CardTitle, CardContent } from './ui/card'
 import {
   TrendingUp,
@@ -498,43 +499,56 @@ export function FinanceDashboard({
           {/* Tarjetas de Métricas Anuales (Ingresos, Gastos y Balance Neto) */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             {/* Total Ingresos */}
-            <div className="p-3.5 rounded-2xl bg-muted/30 border border-border/80">
+            <div className="p-3.5 rounded-2xl bg-muted/30 border border-border/80 min-w-0 overflow-hidden">
               <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1">
-                <ArrowUpRight className="h-3.5 w-3.5 text-emerald-500" />
+                <ArrowUpRight className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
                 Total Ingresos ({selectedYear})
               </span>
-              <span className="text-lg font-bold text-emerald-600 dark:text-emerald-400 mt-1 block">
-                {formatCurrency(annualMetrics.totalIncome, currency)}
-              </span>
+              <div className="mt-1">
+                <CurrencyText
+                  amount={annualMetrics.totalIncome}
+                  currency={currency}
+                  autoFit={true}
+                  className="text-lg font-bold text-emerald-600 dark:text-emerald-400"
+                />
+              </div>
             </div>
 
             {/* Total Gastos */}
-            <div className="p-3.5 rounded-2xl bg-muted/30 border border-border/80">
+            <div className="p-3.5 rounded-2xl bg-muted/30 border border-border/80 min-w-0 overflow-hidden">
               <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1">
-                <ArrowDownRight className="h-3.5 w-3.5 text-[#991b1b]" />
+                <ArrowDownRight className="h-3.5 w-3.5 text-[#991b1b] shrink-0" />
                 Total Gastos ({selectedYear})
               </span>
-              <span className="text-lg font-bold text-[#991b1b] dark:text-red-400 mt-1 block">
-                {formatCurrency(annualMetrics.totalExpense, currency)}
-              </span>
+              <div className="mt-1">
+                <CurrencyText
+                  amount={annualMetrics.totalExpense}
+                  currency={currency}
+                  autoFit={true}
+                  className="text-lg font-bold text-[#991b1b] dark:text-red-400"
+                />
+              </div>
             </div>
 
             {/* Balance Neto Anual */}
-            <div className="p-3.5 rounded-2xl bg-muted/30 border border-border/80">
+            <div className="p-3.5 rounded-2xl bg-muted/30 border border-border/80 min-w-0 overflow-hidden">
               <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1">
-                <Scale className="h-3.5 w-3.5 text-primary" />
+                <Scale className="h-3.5 w-3.5 text-primary shrink-0" />
                 Balance Neto ({selectedYear})
               </span>
-              <span
-                className={`text-lg font-bold mt-1 block ${
-                  annualMetrics.netBalance >= 0
-                    ? 'text-emerald-600 dark:text-emerald-400'
-                    : 'text-[#991b1b] dark:text-red-400'
-                }`}
-              >
-                {annualMetrics.netBalance >= 0 ? '+' : ''}
-                {formatCurrency(annualMetrics.netBalance, currency)}
-              </span>
+              <div className="mt-1">
+                <CurrencyText
+                  amount={annualMetrics.netBalance}
+                  currency={currency}
+                  sign={annualMetrics.netBalance >= 0 ? 'plus' : 'minus'}
+                  autoFit={true}
+                  className={`text-lg font-bold ${
+                    annualMetrics.netBalance >= 0
+                      ? 'text-emerald-600 dark:text-emerald-400'
+                      : 'text-[#991b1b] dark:text-red-400'
+                  }`}
+                />
+              </div>
             </div>
           </div>
 
@@ -572,11 +586,14 @@ export function FinanceDashboard({
                         return item ? `${item.fullName} ${selectedYear}` : label
                       }}
                       contentStyle={{
-                        backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                        backgroundColor: 'rgba(255, 255, 255, 0.96)',
+                        color: '#0f172a',
                         borderRadius: '12px',
-                        border: '1px solid #e2e8f0',
+                        border: '1px solid #cbd5e1',
                         boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
                       }}
+                      labelStyle={{ color: '#0f172a', fontWeight: 700 }}
+                      itemStyle={{ color: '#0f172a', fontWeight: 600 }}
                     />
                     <Legend
                       verticalAlign="top"
@@ -624,11 +641,14 @@ export function FinanceDashboard({
                         return item ? `${item.fullName} ${selectedYear}` : label
                       }}
                       contentStyle={{
-                        backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                        backgroundColor: 'rgba(255, 255, 255, 0.96)',
+                        color: '#0f172a',
                         borderRadius: '12px',
-                        border: '1px solid #e2e8f0',
+                        border: '1px solid #cbd5e1',
                         boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
                       }}
+                      labelStyle={{ color: '#0f172a', fontWeight: 700 }}
+                      itemStyle={{ color: '#0f172a', fontWeight: 600 }}
                     />
                     <Legend
                       verticalAlign="top"
@@ -673,7 +693,7 @@ export function FinanceDashboard({
                 return (
                   <div
                     key={m.name}
-                    className={`p-2.5 rounded-xl border text-center transition-all ${
+                    className={`p-2.5 rounded-xl border text-center transition-all min-w-0 overflow-hidden ${
                       hasMovement
                         ? 'border-border bg-card shadow-xs'
                         : 'border-dashed border-border/70 bg-muted/10 opacity-70'
@@ -682,19 +702,31 @@ export function FinanceDashboard({
                     <span className="text-[11px] font-bold text-muted-foreground block">
                       {m.name}
                     </span>
-                    <div className="mt-1 space-y-0.5">
+                    <div className="mt-1 space-y-0.5 min-w-0">
                       {m.ingreso > 0 && (
-                        <span className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 block truncate">
-                          +{formatCurrency(m.ingreso, currency)}
-                        </span>
+                        <CurrencyText
+                          amount={m.ingreso}
+                          currency={currency}
+                          sign="plus"
+                          autoFit={true}
+                          className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400"
+                        />
                       )}
                       {m.gasto > 0 && (
-                        <span className="text-[11px] font-semibold text-[#991b1b] dark:text-red-400 block truncate">
-                          -{formatCurrency(m.gasto, currency)}
-                        </span>
+                        <CurrencyText
+                          amount={m.gasto}
+                          currency={currency}
+                          sign="minus"
+                          autoFit={true}
+                          className="text-[11px] font-semibold text-[#991b1b] dark:text-red-400"
+                        />
                       )}
                       {!hasMovement && (
-                        <span className="text-xs text-muted-foreground block">$0</span>
+                        <CurrencyText
+                          amount={0}
+                          currency={currency}
+                          className="text-xs text-muted-foreground"
+                        />
                       )}
                     </div>
                   </div>
