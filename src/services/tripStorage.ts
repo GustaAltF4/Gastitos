@@ -25,6 +25,7 @@ export interface GastoViaje {
   tipoPlata: TipoPlata
   dias?: number
   totalRestante: number
+  esIngreso?: boolean
 }
 
 export interface TripState {
@@ -42,7 +43,25 @@ export interface TripState {
   categories: string[]
 }
 
+export interface FinishedTrip {
+  id: string
+  nombre: string
+  destino: string
+  fechaInicio: string
+  fechaFin: string
+  plataArgentinaInicial: number
+  plataChilenaInicial: number
+  plataArgentinaFinal: number
+  plataChilenaFinal: number
+  totalGastadoArs: number
+  totalGastadoClp: number
+  totalIngresosArs?: number
+  totalIngresosClp?: number
+  gastos: GastoViaje[]
+}
+
 const TRIP_STORAGE_KEY = 'plata_viaje_camion_state_v3'
+const TRIP_HISTORY_KEY = 'plata_viaje_camion_history_v3'
 
 const DEFAULT_TRIP_STATE: TripState = {
   plataArgentina: 0,
@@ -135,7 +154,7 @@ export const tripStorage = {
   async resetTrip(current: TripState): Promise<TripState> {
     const freshState: TripState = {
       ...DEFAULT_TRIP_STATE,
-      nombre: current.nombre, // Conserva el nombre del chofer para que no tenga que tipearlo de nuevo si no quiere
+      nombre: current.nombre,
       darkMode: current.darkMode,
       themeColor: current.themeColor,
       borderRadius: current.borderRadius,
@@ -150,5 +169,35 @@ export const tripStorage = {
     }
     await this.saveState(freshState)
     return freshState
+  },
+
+  async getTripHistory(): Promise<FinishedTrip[]> {
+    try {
+      const { value } = await Preferences.get({ key: TRIP_HISTORY_KEY })
+      if (!value) return []
+      return JSON.parse(value)
+    } catch {
+      return []
+    }
+  },
+
+  async saveTripHistory(history: FinishedTrip[]): Promise<void> {
+    await Preferences.set({
+      key: TRIP_HISTORY_KEY,
+      value: JSON.stringify(history),
+    })
+  },
+
+  async addTripToHistory(trip: FinishedTrip): Promise<void> {
+    const current = await this.getTripHistory()
+    const updated = [trip, ...current]
+    await this.saveTripHistory(updated)
+  },
+
+  async deleteTripFromHistory(id: string): Promise<FinishedTrip[]> {
+    const current = await this.getTripHistory()
+    const updated = current.filter((t) => t.id !== id)
+    await this.saveTripHistory(updated)
+    return updated
   },
 }

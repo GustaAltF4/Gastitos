@@ -179,7 +179,25 @@
   will-change: transform;
 }
 .press-effect:active {
-  transform: scale(0.96);
+  transform: scale(0.95);
+}
+
+/* Animación táctil automática para TODOS los botones */
+button,
+[role="button"],
+input[type="button"],
+input[type="submit"] {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  transition: transform 0.09s cubic-bezier(0.2, 0, 0, 1), filter 0.09s ease;
+}
+button:active:not(:disabled),
+[role="button"]:active:not(:disabled),
+input[type="button"]:active:not(:disabled),
+input[type="submit"]:active:not(:disabled) {
+  transform: scale(0.94);
+  filter: brightness(0.95);
 }
 
 /* Respeto estricto para ahorro de batería o accesibilidad */

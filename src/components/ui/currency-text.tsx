@@ -32,9 +32,11 @@ export function CurrencyText({
     const textEl = textRef.current
     if (!container || !textEl) return
 
+    let lastWidth = -1
     const adjustSize = () => {
       textEl.style.fontSize = ""
       const availableWidth = container.clientWidth
+      lastWidth = availableWidth
       const contentWidth = textEl.scrollWidth
       if (availableWidth > 0 && contentWidth > availableWidth) {
         const currentFontSize = parseFloat(window.getComputedStyle(textEl).fontSize) || 16
@@ -46,11 +48,22 @@ export function CurrencyText({
 
     adjustSize()
 
-    const observer = new ResizeObserver(() => {
-      adjustSize()
+    let frameId: number | null = null
+    const observer = new ResizeObserver((entries) => {
+      const entry = entries[0]
+      if (entry && Math.abs(entry.contentRect.width - lastWidth) < 1) {
+        return
+      }
+      if (frameId) cancelAnimationFrame(frameId)
+      frameId = requestAnimationFrame(() => {
+        adjustSize()
+      })
     })
     observer.observe(container)
-    return () => observer.disconnect()
+    return () => {
+      if (frameId) cancelAnimationFrame(frameId)
+      observer.disconnect()
+    }
   }, [amount, currency, sign, autoFit])
 
   // Re-ajustar también luego de que carguen las fuentes
@@ -96,7 +109,7 @@ export function CurrencyText({
   return (
     <div
       ref={containerRef}
-      className={cn("w-full min-w-0 overflow-hidden", isRightAligned && "text-right")}
+      className={cn("w-full min-w-0 overflow-hidden", isRightAligned && "text-right flex justify-end")}
     >
       {content}
     </div>

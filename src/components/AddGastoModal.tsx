@@ -101,23 +101,23 @@ export function AddGastoModal({
       <div className="w-12 h-1.5 bg-muted-foreground/25 rounded-full mx-auto -mt-2 mb-4 sm:hidden" />
 
       <DialogHeader>
-        <DialogTitle className="text-2xl flex items-center gap-2">
-          <Truck className="h-6 w-6 text-primary" />
+        <DialogTitle className="text-2xl sm:text-3xl font-black flex items-center gap-2.5">
+          <Truck className="h-7 w-7 text-primary" />
           Agregar Gasto del Viaje
         </DialogTitle>
-        <DialogDescription>
-          Anota cuánto gastaste, en qué rubro y con qué moneda pagaste.
+        <DialogDescription className="text-sm sm:text-base font-medium">
+          Anotá cuánto gastaste, en qué rubro y con qué moneda pagaste.
         </DialogDescription>
       </DialogHeader>
 
       <form onSubmit={handleSubmit} className="space-y-4">
         {/* 1. Monto */}
         <div>
-          <label className="text-sm font-bold text-muted-foreground uppercase tracking-wider block mb-1.5">
+          <label className="text-base sm:text-lg font-black text-foreground block mb-2">
             ¿Cuánto gastaste?
           </label>
           <div className="relative">
-            <span className="absolute left-4 top-1/2 -translate-y-1/2 font-extrabold text-muted-foreground text-2xl">
+            <span className="absolute left-4 top-1/2 -translate-y-1/2 font-black text-muted-foreground text-3xl">
               $
             </span>
             <Input
@@ -128,7 +128,7 @@ export function AddGastoModal({
               placeholder="0"
               value={montoStr}
               onChange={(e) => setMontoStr(e.target.value)}
-              className="pl-10 !text-2xl font-extrabold h-14 rounded-[var(--radius)]"
+              className="pl-12 !text-3xl sm:!text-4xl font-black h-16 rounded-[var(--radius)]"
               autoFocus
             />
           </div>
@@ -136,33 +136,33 @@ export function AddGastoModal({
 
         {/* 2. ¿Con qué dinero? (Botones grandes de 1 toque para Argentina o Chile) */}
         <div>
-          <label className="text-sm font-bold text-muted-foreground uppercase tracking-wider block mb-1.5">
+          <label className="text-base sm:text-lg font-black text-foreground block mb-2">
             ¿Con qué dinero pagaste?
           </label>
-          <div className="grid grid-cols-2 gap-2.5">
+          <div className="grid grid-cols-2 gap-3">
             <button
               type="button"
               onClick={() => setTipoPlata('Plata Argentina')}
-              className={`flex items-center justify-center gap-2 py-3.5 px-3 rounded-[var(--radius)] border-2 text-base sm:text-lg font-bold transition-all active:scale-95 touch-manipulation select-none ${
+              className={`flex items-center justify-center gap-2.5 py-4 sm:py-5 px-3 rounded-[var(--radius)] border-2 text-base sm:text-xl font-black transition-all touch-manipulation select-none ${
                 tipoPlata === 'Plata Argentina'
                   ? 'border-primary bg-primary text-primary-foreground shadow-md shadow-primary/25'
                   : 'border-border bg-card text-muted-foreground active:bg-primary/15'
               }`}
             >
-              <span className="text-xl">🇦🇷</span>
+              <span className="text-2xl sm:text-3xl">🇦🇷</span>
               <span>Argentina (ARS)</span>
             </button>
 
             <button
               type="button"
               onClick={() => setTipoPlata('Plata Chilena')}
-              className={`flex items-center justify-center gap-2 py-3.5 px-3 rounded-[var(--radius)] border-2 text-base sm:text-lg font-bold transition-all active:scale-95 touch-manipulation select-none ${
+              className={`flex items-center justify-center gap-2.5 py-4 sm:py-5 px-3 rounded-[var(--radius)] border-2 text-base sm:text-xl font-black transition-all touch-manipulation select-none ${
                 tipoPlata === 'Plata Chilena'
                   ? 'border-primary bg-primary text-primary-foreground shadow-md shadow-primary/25'
                   : 'border-border bg-card text-muted-foreground active:bg-primary/15'
               }`}
             >
-              <span className="text-xl">🇨🇱</span>
+              <span className="text-2xl sm:text-3xl">🇨🇱</span>
               <span>Chilena (CLP)</span>
             </button>
           </div>
@@ -170,22 +170,22 @@ export function AddGastoModal({
 
         {/* 3. ¿En qué lo gastaste? (Categoría personalizable) */}
         <div>
-          <div className="flex items-center justify-between mb-1.5">
-            <label className="text-sm font-bold text-muted-foreground uppercase tracking-wider">
+          <div className="flex items-center justify-between mb-2">
+            <label className="text-base sm:text-lg font-black text-foreground">
               ¿En qué lo gastaste?
             </label>
             <button
               type="button"
               onClick={() => setIsCreatingCategory(!isCreatingCategory)}
-              className="text-xs px-3 py-1 rounded-full bg-primary/15 text-primary border border-primary/30 active:scale-95 active:bg-primary active:text-primary-foreground transition-all flex items-center gap-1 font-bold touch-manipulation select-none"
+              className="text-xs sm:text-sm px-3.5 py-1.5 rounded-full bg-primary/15 text-primary border border-primary/30 active:scale-95 active:bg-primary active:text-primary-foreground transition-all flex items-center gap-1.5 font-bold touch-manipulation select-none"
             >
               {isCreatingCategory ? (
                 <>
-                  <X className="h-3.5 w-3.5" /> Cancelar
+                  <X className="h-4 w-4" /> Cancelar
                 </>
               ) : (
                 <>
-                  <Plus className="h-3.5 w-3.5" /> Nueva categoría
+                  <Plus className="h-4 w-4" /> Nueva categoría
                 </>
               )}
             </button>
@@ -204,12 +204,12 @@ export function AddGastoModal({
                   }
                 }}
                 autoFocus
-                className="h-12 text-lg rounded-[var(--radius)]"
+                className="h-14 text-xl font-bold rounded-[var(--radius)]"
               />
               <Button
                 type="button"
                 onClick={handleCreateNewCategory}
-                className="h-12 px-5 shrink-0 font-bold rounded-[var(--radius)]"
+                className="h-14 px-6 shrink-0 text-lg font-black rounded-[var(--radius)]"
               >
                 Agregar
               </Button>
@@ -224,10 +224,10 @@ export function AddGastoModal({
                   setDias(1)
                 }
               }}
-              className="w-full h-14 px-4 rounded-[var(--radius)] border border-input bg-card text-xl font-bold text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+              className="w-full h-16 px-4 rounded-[var(--radius)] border-2 border-input bg-card text-xl sm:text-2xl font-black text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
             >
               {availableCategories.map((cat) => (
-                <option key={cat} value={cat} className="text-lg">
+                <option key={cat} value={cat} className="text-xl font-bold">
                   {cat}
                 </option>
               ))}
@@ -237,8 +237,8 @@ export function AddGastoModal({
 
         {/* 4. Si es Estadía: ¿Cuántos días? con botones - y + grandes */}
         {isEstadia && (
-          <div className="p-3.5 rounded-[var(--radius)] bg-primary/10 border border-primary/30 space-y-2">
-            <label className="text-sm font-bold text-primary uppercase tracking-wider block">
+          <div className="p-4 rounded-[var(--radius)] bg-primary/10 border-2 border-primary/30 space-y-2.5">
+            <label className="text-base font-black text-primary uppercase tracking-wider block">
               ¿Cuántos días de estadía?
             </label>
             <div className="flex items-center gap-3">
@@ -246,9 +246,9 @@ export function AddGastoModal({
                 type="button"
                 variant="outline"
                 onClick={() => setDias((d) => Math.max(1, d - 1))}
-                className="h-12 w-12 p-0 rounded-[var(--radius)] text-xl font-bold shrink-0"
+                className="h-14 w-14 p-0 rounded-[var(--radius)] text-2xl font-black shrink-0"
               >
-                <Minus className="h-5 w-5" />
+                <Minus className="h-6 w-6 stroke-[3]" />
               </Button>
               <Input
                 type="number"
@@ -256,19 +256,19 @@ export function AddGastoModal({
                 min={1}
                 value={dias}
                 onChange={(e) => setDias(Math.max(1, parseInt(e.target.value, 10) || 1))}
-                className="h-12 !text-2xl font-extrabold text-center rounded-[var(--radius)]"
+                className="h-14 !text-3xl font-black text-center rounded-[var(--radius)]"
               />
               <Button
                 type="button"
                 variant="outline"
                 onClick={() => setDias((d) => d + 1)}
-                className="h-12 w-12 p-0 rounded-[var(--radius)] text-xl font-bold shrink-0"
+                className="h-14 w-14 p-0 rounded-[var(--radius)] text-2xl font-black shrink-0"
               >
-                <Plus className="h-5 w-5" />
+                <Plus className="h-6 w-6 stroke-[3]" />
               </Button>
             </div>
             {previewTotal > 0 && (
-              <p className="text-sm font-bold text-primary text-center pt-1">
+              <p className="text-base font-black text-primary text-center pt-1">
                 Total por {dias} día{dias > 1 ? 's' : ''}: ${previewTotal.toLocaleString('es-AR')}
               </p>
             )}
@@ -277,31 +277,31 @@ export function AddGastoModal({
 
         {/* 5. Nota opcional */}
         <div>
-          <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider block mb-1.5">
+          <label className="text-sm font-bold text-muted-foreground block mb-1.5">
             Nota / Detalle (Opcional)
           </label>
           <Input
             placeholder="Ej: YPF Mendoza, Aduana Cristo Redentor..."
             value={descripcion}
             onChange={(e) => setDescripcion(e.target.value)}
-            className="h-12 text-base rounded-[var(--radius)]"
+            className="h-14 text-lg font-semibold rounded-[var(--radius)]"
           />
         </div>
 
         {/* Botones Grandes */}
-        <div className="flex flex-col gap-2.5 pt-2">
+        <div className="flex flex-col gap-3 pt-3">
           <Button
             type="submit"
-            className="w-full h-14 text-xl font-bold bg-primary hover:bg-primary/90 text-primary-foreground rounded-[var(--radius)] flex items-center justify-center gap-2 shadow-md shadow-primary/25"
+            className="w-full h-16 text-2xl font-black bg-primary hover:bg-primary/90 text-primary-foreground rounded-[var(--radius)] flex items-center justify-center gap-3 shadow-lg shadow-primary/25"
           >
-            <Save className="h-6 w-6" />
+            <Save className="h-7 w-7" />
             Guardar Gasto
           </Button>
           <Button
             type="button"
             variant="outline"
             onClick={() => onOpenChange(false)}
-            className="w-full h-12 text-lg font-semibold rounded-[var(--radius)]"
+            className="w-full h-14 text-xl font-bold rounded-[var(--radius)]"
           >
             Cancelar
           </Button>

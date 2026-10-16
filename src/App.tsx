@@ -2,24 +2,29 @@ import { useState, useEffect, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Truck,
-  RotateCw,
-  Newspaper,
-  Save,
   FileDown,
   Trash2,
   Plus,
   Receipt,
   Settings,
-  BarChart3,
   CirclePlus,
   Search,
-  Lock,
+  Flag,
+  ArrowRight,
+  Clock,
+  History,
+  ChevronDown,
+  CircleDollarSign,
 } from 'lucide-react'
 import { TripMenu } from './components/TripMenu'
 import { AddGastoModal } from './components/AddGastoModal'
+import { InitTripModal } from './components/InitTripModal'
+import { CargarPlataModal } from './components/CargarPlataModal'
 import { TripSettingsTab } from './components/TripSettingsTab'
-import { FinanceDashboard } from './components/FinanceDashboard'
+import { TripCharts } from './components/TripCharts'
+import { TripHistoryTab } from './components/TripHistoryTab'
 import { GlowCard } from './components/react-bits/GlowCard'
+import { CurrencyText } from './components/ui/currency-text'
 import { Card, CardContent, CardHeader, CardTitle } from './components/ui/card'
 import { Input } from './components/ui/input'
 import { Button } from './components/ui/button'
@@ -27,19 +32,18 @@ import { RADIUS_VALUES } from './services/storage'
 import {
   tripStorage,
   TripState,
+  FinishedTrip,
   GastoViaje,
   TipoPlata,
   DEFAULT_TRUCK_CATEGORIES,
 } from './services/tripStorage'
 import { exportTripPDF } from './services/tripPdf'
-import { Transaction } from './types/finance'
-import { getLocalDateString } from './lib/utils'
 
 function FlagArgentina() {
   return (
     <svg
       viewBox="0 0 36 24"
-      className="w-10 h-7 rounded-md shadow-xs shrink-0 border border-black/15"
+      className="w-12 h-8 rounded-lg shadow-xs shrink-0 border border-black/15"
       aria-label="Argentina"
     >
       <rect width="36" height="24" fill="#74ACDF" />
@@ -53,7 +57,7 @@ function FlagChile() {
   return (
     <svg
       viewBox="0 0 36 24"
-      className="w-10 h-7 rounded-md shadow-xs shrink-0 border border-black/15"
+      className="w-12 h-8 rounded-lg shadow-xs shrink-0 border border-black/15"
       aria-label="Chile"
     >
       <rect width="36" height="12" fill="#FFFFFF" />
@@ -91,14 +95,22 @@ export function App() {
     categories: DEFAULT_TRUCK_CATEGORIES,
   })
 
-  const [inputArs, setInputArs] = useState('')
-  const [inputClp, setInputClp] = useState('')
+  const [history, setHistory] = useState<FinishedTrip[]>([])
   const [loaded, setLoaded] = useState(false)
 
-  const [activeTab, setActiveTab] = useState<'trip' | 'gastos' | 'charts' | 'settings'>('trip')
+  const [activeTab, setActiveTab] = useState<'trip' | 'gastos' | 'history' | 'settings'>('trip')
   const [monedaFilter, setMonedaFilter] = useState<'all' | TipoPlata>('all')
   const [searchTerm, setSearchTerm] = useState('')
+
+  // Modales
+  const [isInitTripModalOpen, setIsInitTripModalOpen] = useState(false)
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
+  const [isCargarPlataModalOpen, setIsCargarPlataModalOpen] = useState(false)
+  const [cargarPlataMoneda, setCargarPlataMoneda] = useState<TipoPlata>('Plata Argentina')
+
+  // Acordeones de saldos ARS y CLP
+  const [expandedArs, setExpandedArs] = useState(false)
+  const [expandedClp, setExpandedClp] = useState(false)
 
   // Aplicar clases de tema, modo oscuro y redondeo de bordes (--radius)
   const applyThemeClasses = (dark: boolean, theme: string, radius: string = 'lg') => {
@@ -127,11 +139,13 @@ export function App() {
 
   useEffect(() => {
     async function init() {
-      const saved = await tripStorage.loadState()
-      setTripState(saved)
-      setInputArs(saved.guardado ? String(saved.plataArgentina) : '')
-      setInputClp(saved.guardado ? String(saved.plataChilena) : '')
-      applyThemeClasses(saved.darkMode, saved.themeColor, saved.borderRadius)
+      const [savedTrip, savedHistory] = await Promise.all([
+        tripStorage.loadState(),
+        tripStorage.getTripHistory(),
+      ])
+      setTripState(savedTrip)
+      setHistory(savedHistory)
+      applyThemeClasses(savedTrip.darkMode, savedTrip.themeColor, savedTrip.borderRadius)
       setLoaded(true)
     }
     init()
@@ -152,31 +166,19 @@ export function App() {
     handleUpdatePartial({ darkMode: !tripState.darkMode })
   }
 
-  const isInitialFormValid =
-    inputArs.trim() !== '' &&
-    inputClp.trim() !== '' &&
-    tripState.destino.trim() !== ''
-
-  const guardarInicioViaje = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!isInitialFormValid) {
-      alert('Por favor completa la Plata Inicial Argentina, Plata Inicial Chilena y el Destino del viaje.')
-      return
-    }
-
-    const arsNum = parseFloat(inputArs) || 0
-    const clpNum = parseFloat(inputClp) || 0
-
+  const handleInitTrip = async (ars: number, clp: number, destino: string) => {
     const next: TripState = {
       ...tripState,
-      plataArgentina: arsNum,
-      plataChilena: clpNum,
-      plataArgentinaInicial: arsNum,
-      plataChilenaInicial: clpNum,
-      destino: tripState.destino.trim(),
+      plataArgentina: ars,
+      plataChilena: clp,
+      plataArgentinaInicial: ars,
+      plataChilenaInicial: clp,
+      destino,
       guardado: true,
+      gastos: [],
     }
     await updateAndPersist(next)
+    setActiveTab('trip')
   }
 
   const handleAddCategory = (newCat: string) => {
@@ -228,16 +230,57 @@ export function App() {
       ...tripState,
       plataArgentina: nuevaArs,
       plataChilena: nuevaClp,
-      gastos: [...tripState.gastos, nuevoGasto],
+      gastos: [nuevoGasto, ...tripState.gastos], // Lo más reciente primero
+    }
+
+    await updateAndPersist(next)
+  }
+
+  const handleCargarPlata = async ({
+    monto,
+    tipoPlata,
+    descripcion,
+  }: {
+    monto: number
+    tipoPlata: TipoPlata
+    descripcion: string
+  }) => {
+    if (!tripState.guardado) return
+
+    let nuevaArs = tripState.plataArgentina
+    let nuevaClp = tripState.plataChilena
+    let totalRestante = 0
+
+    if (tipoPlata === 'Plata Argentina') {
+      nuevaArs = tripState.plataArgentina + monto
+      totalRestante = nuevaArs
+    } else {
+      nuevaClp = tripState.plataChilena + monto
+      totalRestante = nuevaClp
+    }
+
+    const nuevoIngreso: GastoViaje = {
+      id: `ingreso-${Date.now()}`,
+      fecha: new Date().toLocaleDateString('es-AR'),
+      tipoGasto: 'Ingreso para el viaje',
+      descripcion: descripcion || '',
+      monto,
+      tipoPlata,
+      totalRestante,
+      esIngreso: true,
+    }
+
+    const next: TripState = {
+      ...tripState,
+      plataArgentina: nuevaArs,
+      plataChilena: nuevaClp,
+      gastos: [nuevoIngreso, ...tripState.gastos],
     }
 
     await updateAndPersist(next)
   }
 
   const eliminarGasto = async (idOrIndex: string | number) => {
-    const confirmado = window.confirm('¿Estás seguro que querés eliminar este gasto?')
-    if (!confirmado) return
-
     const index =
       typeof idOrIndex === 'number'
         ? idOrIndex
@@ -245,28 +288,45 @@ export function App() {
     const gasto = tripState.gastos[index]
     if (!gasto) return
 
+    const esIngreso = Boolean(gasto.esIngreso)
+    const mensaje = esIngreso
+      ? '¿Estás seguro que querés eliminar este ingreso para el viaje? Se descontará del saldo disponible.'
+      : '¿Estás seguro que querés eliminar este gasto? Se devolverá al saldo disponible.'
+
+    const confirmado = window.confirm(mensaje)
+    if (!confirmado) return
+
     let nuevaArs = tripState.plataArgentina
     let nuevaClp = tripState.plataChilena
 
     if (gasto.tipoPlata === 'Plata Argentina') {
-      nuevaArs += gasto.monto
+      if (esIngreso) nuevaArs -= gasto.monto
+      else nuevaArs += gasto.monto
     } else if (gasto.tipoPlata === 'Plata Chilena') {
-      nuevaClp += gasto.monto
+      if (esIngreso) nuevaClp -= gasto.monto
+      else nuevaClp += gasto.monto
     }
 
     const nuevosGastos = tripState.gastos.filter((_, i) => i !== index)
 
     let runningArs = tripState.plataArgentinaInicial
     let runningClp = tripState.plataChilenaInicial
-    const gastosRecalculados = nuevosGastos.map((g) => {
+
+    // Recalculamos saldos cronológicamente
+    const cronologicos = [...nuevosGastos].reverse().map((g) => {
+      const monto = Number(g.monto) || 0
       if (g.tipoPlata === 'Plata Argentina') {
-        runningArs -= g.monto
+        if (g.esIngreso) runningArs += monto
+        else runningArs -= monto
         return { ...g, totalRestante: runningArs }
       } else {
-        runningClp -= g.monto
+        if (g.esIngreso) runningClp += monto
+        else runningClp -= monto
         return { ...g, totalRestante: runningClp }
       }
     })
+
+    const gastosRecalculados = cronologicos.reverse()
 
     const next: TripState = {
       ...tripState,
@@ -278,75 +338,101 @@ export function App() {
     await updateAndPersist(next)
   }
 
-  const resetViaje = async () => {
-    const confirmado = window.confirm(
-      '¿Estás seguro que querés reiniciar todo? Esto borrará la plata y los gastos para empezar un viaje nuevo.'
-    )
-    if (!confirmado) return
+  // Cálculos de total gastado y plata recibida
+  const { totalGastadoArs, totalGastadoClp, totalIngresosArs, totalIngresosClp } = useMemo(() => {
+    let gastadoArs = 0
+    let gastadoClp = 0
+    let ingresosArs = 0
+    let ingresosClp = 0
 
-    const fresh = await tripStorage.resetTrip(tripState)
-    setTripState(fresh)
-    setInputArs('')
-    setInputClp('')
-    setActiveTab('trip')
-  }
-
-  // Gastos filtrados para la vista de lista/tabla
-  const filteredGastos = useMemo(() => {
-    return tripState.gastos
-      .map((g, originalIndex) => ({ ...g, originalIndex }))
-      .filter((g) => {
-        const matchesMoneda = monedaFilter === 'all' || g.tipoPlata === monedaFilter
-        const matchesSearch =
-          !searchTerm.trim() ||
-          g.tipoGasto.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          (g.descripcion && g.descripcion.toLowerCase().includes(searchTerm.toLowerCase())) ||
-          g.fecha.toLowerCase().includes(searchTerm.toLowerCase())
-        return matchesMoneda && matchesSearch
-      })
-  }, [tripState.gastos, monedaFilter, searchTerm])
-
-  // Adaptador para los gráficos (enfocado en Gastos del viaje y saldos restantes)
-  const { dashboardTransactions, arsSummary, clpSummary } = useMemo(() => {
-    const todayIso = getLocalDateString()
-    const txs: Transaction[] = []
-
-    let arsGastado = 0
-    let clpGastado = 0
-
-    tripState.gastos.forEach((g, idx) => {
-      const isClp = g.tipoPlata === 'Plata Chilena'
-      if (isClp) clpGastado += g.monto
-      else arsGastado += g.monto
-
-      txs.push({
-        id: g.id || `g-${idx}`,
-        type: 'expense',
-        amount: g.monto,
-        category: g.tipoGasto,
-        scope: isClp ? 'business' : 'personal',
-        date: todayIso,
-        description: g.descripcion || g.tipoGasto,
-        createdAt: todayIso,
-      })
+    tripState.gastos.forEach((g) => {
+      const monto = Number(g.monto) || 0
+      if (g.esIngreso) {
+        if (g.tipoPlata === 'Plata Argentina') ingresosArs += monto
+        else ingresosClp += monto
+      } else {
+        if (g.tipoPlata === 'Plata Argentina') gastadoArs += monto
+        else gastadoClp += monto
+      }
     })
 
     return {
-      dashboardTransactions: txs,
-      arsSummary: {
-        income: tripState.plataArgentinaInicial,
-        expense: arsGastado,
-        balance: tripState.plataArgentina,
-        carryOver: 0,
-      },
-      clpSummary: {
-        income: tripState.plataChilenaInicial,
-        expense: clpGastado,
-        balance: tripState.plataChilena,
-        carryOver: 0,
-      },
+      totalGastadoArs: gastadoArs,
+      totalGastadoClp: gastadoClp,
+      totalIngresosArs: ingresosArs,
+      totalIngresosClp: ingresosClp,
     }
-  }, [tripState])
+  }, [tripState.gastos])
+
+  // Terminar Viaje y pasarlo al historial
+  const terminarViaje = async () => {
+    const quiereTerminar = window.confirm(
+      `¿Deseas TERMINAR el viaje a "${tripState.destino || 'este destino'}"?\n\nEste viaje se guardará en tu Historial con todos sus gastos y podrás descargar el PDF cuando quieras.`
+    )
+    if (!quiereTerminar) return
+
+    if (tripState.gastos.length > 0) {
+      const exportar = window.confirm('¿Querés descargar o compartir el PDF del viaje ahora?')
+      if (exportar) {
+        await exportTripPDF(tripState)
+      }
+    }
+
+    // Armar viaje terminado para guardar en el historial
+    const fechaFin = new Date().toLocaleDateString('es-AR')
+    const fechaInicio =
+      tripState.gastos.length > 0
+        ? tripState.gastos[tripState.gastos.length - 1].fecha
+        : fechaFin
+
+    const finishedTrip: FinishedTrip = {
+      id: `viaje-${Date.now()}`,
+      nombre: tripState.nombre,
+      destino: tripState.destino || 'Sin especificar',
+      fechaInicio,
+      fechaFin,
+      plataArgentinaInicial: tripState.plataArgentinaInicial,
+      plataChilenaInicial: tripState.plataChilenaInicial,
+      plataArgentinaFinal: tripState.plataArgentina,
+      plataChilenaFinal: tripState.plataChilena,
+      totalGastadoArs,
+      totalGastadoClp,
+      totalIngresosArs,
+      totalIngresosClp,
+      gastos: tripState.gastos,
+    }
+
+    await tripStorage.addTripToHistory(finishedTrip)
+    setHistory((prev) => [finishedTrip, ...prev])
+
+    // Reiniciar viaje actual
+    const fresh = await tripStorage.resetTrip(tripState)
+    setTripState(fresh)
+    setActiveTab('trip')
+  }
+
+  const handleDeleteTripFromHistory = async (id: string) => {
+    const updated = await tripStorage.deleteTripFromHistory(id)
+    setHistory(updated)
+  }
+
+  // Filtrado de gastos para la lista completa
+  const filteredGastos = useMemo(() => {
+    return tripState.gastos.filter((g) => {
+      const matchesMoneda = monedaFilter === 'all' || g.tipoPlata === monedaFilter
+      const matchesSearch =
+        !searchTerm.trim() ||
+        g.tipoGasto.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (g.descripcion && g.descripcion.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        g.fecha.toLowerCase().includes(searchTerm.toLowerCase())
+      return matchesMoneda && matchesSearch
+    })
+  }, [tripState.gastos, monedaFilter, searchTerm])
+
+  // Últimos gastos (máximo 4 para el resumen en la pantalla Viaje)
+  const ultimosGastos = useMemo(() => {
+    return tripState.gastos.slice(0, 4)
+  }, [tripState.gastos])
 
   if (!loaded) {
     return <div className="min-h-screen bg-background text-foreground" />
@@ -369,7 +455,7 @@ export function App() {
       className="min-h-screen bg-background text-foreground flex flex-col sm:pb-32"
       style={{
         paddingBottom:
-          'calc(6.5rem + max(env(safe-area-inset-bottom, 0px), var(--safe-area-inset-bottom, 0px)))',
+          'calc(7.5rem + max(env(safe-area-inset-bottom, 0px), var(--safe-area-inset-bottom, 0px)))',
       }}
     >
       {/* Cabecera Superior Limpia */}
@@ -377,7 +463,7 @@ export function App() {
         darkMode={darkMode}
         onToggleDarkMode={handleToggleDarkMode}
         nombre={nombre}
-        destino={destino}
+        destino={guardado ? destino : ''}
       />
 
       {/* Contenido Principal con Transiciones Fluidas */}
@@ -391,33 +477,33 @@ export function App() {
             transition={{ duration: 0.15, ease: 'easeOut' }}
             className="hardware-accelerated space-y-6"
           >
-            {/* PESTAÑA 1: VIAJE PRINCIPAL */}
+            {/* PESTAÑA 1: VIAJE PRINCIPAL (Con saldos, últimos gastos y gráficos de este viaje) */}
             {activeTab === 'trip' && (
               <div className="space-y-5 max-w-xl mx-auto">
-                {/* Tarjeta Principal de Saldos ARS y CLP con GlowCard */}
+                {/* 1. Tarjeta Principal de Saldos ARS y CLP con GlowCard */}
                 <GlowCard
                   glowColor={
-                    plataArgentina >= 0 && plataChilena >= 0
+                    guardado && plataArgentina >= 0 && plataChilena >= 0
                       ? 'hsl(var(--primary) / 0.28)'
                       : 'rgba(239, 68, 68, 0.25)'
                   }
                   className="bg-gradient-to-br from-card via-card to-muted/30 border border-border/80"
                 >
                   <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center gap-2.5">
-                      <div className="p-2 rounded-[var(--radius)] bg-primary/15 text-primary">
-                        <Truck className="h-6 w-6" />
+                    <div className="flex items-center gap-3">
+                      <div className="p-3 rounded-[var(--radius)] bg-primary/15 text-primary shrink-0">
+                        <Truck className="h-7 w-7 sm:h-8 sm:w-8" strokeWidth={2.4} />
                       </div>
                       <div>
-                        <h2 className="text-lg sm:text-xl font-extrabold text-foreground leading-tight">
+                        <h2 className="text-xl sm:text-2xl md:text-3xl font-black text-foreground leading-tight">
                           {guardado && destino ? `Viaje a ${destino}` : 'Plata Disponible'}
                         </h2>
-                        <p className="text-xs text-muted-foreground">
+                        <p className="text-xs sm:text-sm text-muted-foreground font-bold">
                           {guardado
                             ? `${gastos.length} gasto${gastos.length === 1 ? '' : 's'} registrado${
                                 gastos.length === 1 ? '' : 's'
                               }`
-                            : 'Completa el formulario de abajo para empezar'}
+                            : 'Tocá el botón [+] para iniciar viaje'}
                         </p>
                       </div>
                     </div>
@@ -427,278 +513,407 @@ export function App() {
                         type="button"
                         variant="outline"
                         size="sm"
-                        onClick={() => exportTripPDF(tripState)}
-                        className="rounded-[var(--radius)] border-primary/40 text-primary font-bold gap-1.5"
+                        onClick={terminarViaje}
+                        className="rounded-[var(--radius)] border-2 border-rose-500/40 bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 font-black gap-2 h-11 px-3 sm:px-4 text-xs sm:text-sm shrink-0 touch-manipulation shadow-xs active:scale-95"
+                        title="Finalizar este viaje y pasarlo al historial"
                       >
-                        <FileDown className="h-4 w-4" />
-                        PDF
+                        <Flag className="h-4 w-4 sm:h-5 sm:w-5 stroke-[2.5]" />
+                        <span>Terminar <span className="hidden xs:inline">Viaje</span></span>
                       </Button>
                     )}
                   </div>
 
-                  {/* Saldo Argentina (ARS) */}
-                  <div className="p-4 rounded-[var(--radius)] bg-background/80 dark:bg-muted/30 border border-border/80 flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-3">
-                      <FlagArgentina />
-                      <div>
-                        <span className="text-lg sm:text-xl font-extrabold text-foreground block leading-tight">
-                          ARS (Argentina)
-                        </span>
-                        {guardado && (
-                          <span className="text-xs text-muted-foreground">
-                            Inicial: ${formatMoney(plataArgentinaInicial)} • Gastado: $
-                            {formatMoney(arsSummary.expense)}
+                  {/* Saldo Argentina (ARS) como Acordeón */}
+                  <div className="rounded-[var(--radius)] bg-background/90 dark:bg-muted/40 border border-border/80 overflow-hidden transition-all shadow-xs">
+                    <button
+                      type="button"
+                      onClick={() => setExpandedArs(!expandedArs)}
+                      className="w-full p-4 sm:p-5 text-left touch-manipulation select-none active:bg-muted/60 transition-colors"
+                      aria-expanded={expandedArs}
+                    >
+                      {/* Fila 1: Bandera + ARS a la izquierda | Píldora "Detalles v" a la derecha */}
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-3">
+                          <FlagArgentina />
+                          <span className="text-2xl sm:text-3xl font-black text-foreground leading-tight tracking-tight">
+                            ARS
                           </span>
+                        </div>
+                        {guardado && (
+                          <div
+                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs sm:text-sm font-bold border transition-colors ${
+                              expandedArs
+                                ? 'bg-primary/20 text-primary border-primary/40'
+                                : 'bg-muted/80 text-muted-foreground border-border'
+                            }`}
+                          >
+                            <span>Detalles</span>
+                            <ChevronDown
+                              className={`h-4 w-4 transition-transform duration-200 ${
+                                expandedArs ? 'rotate-180 text-primary' : ''
+                              }`}
+                            />
+                          </div>
                         )}
                       </div>
-                    </div>
-                    <span
-                      className={`text-2xl sm:text-3xl font-black tracking-tight ${
-                        plataArgentina < 0
-                          ? 'text-red-500'
-                          : 'text-emerald-600 dark:text-emerald-400'
-                      }`}
-                    >
-                      ${formatMoney(plataArgentina)}
-                    </span>
+
+                      {/* Fila 2: Saldo disponible con ancho completo (cero superposición) */}
+                      <div className="mt-2.5 pt-2 border-t border-border/40 flex items-baseline justify-between gap-2">
+                        <span className="text-xs sm:text-sm font-bold text-muted-foreground uppercase tracking-wider">
+                          Disponible
+                        </span>
+                        <div className="text-right overflow-hidden flex justify-end">
+                          <CurrencyText
+                            amount={plataArgentina}
+                            currency="ARS"
+                            autoFit={true}
+                            className={`text-3xl sm:text-4xl font-black tracking-tight justify-end text-right ${
+                              !guardado
+                                ? 'text-muted-foreground'
+                                : plataArgentina < 0
+                                ? 'text-red-500'
+                                : 'text-emerald-600 dark:text-emerald-400'
+                            }`}
+                          />
+                        </div>
+                      </div>
+                    </button>
+
+                    <AnimatePresence initial={false}>
+                      {expandedArs && guardado && (
+                        <motion.div
+                          key="ars-accordion"
+                          initial={{ height: 0, opacity: 0 }}
+                          animate={{ height: 'auto', opacity: 1 }}
+                          exit={{ height: 0, opacity: 0 }}
+                          transition={{ duration: 0.2, ease: 'easeInOut' }}
+                          className="overflow-hidden"
+                        >
+                          <div className="px-5 pb-4 pt-2 border-t border-border/60 bg-muted/30">
+                            <div className="flex flex-wrap items-center justify-between gap-y-1.5 gap-x-3 text-sm sm:text-base text-muted-foreground pt-1.5">
+                              <div>
+                                <span className="font-bold text-foreground">Inicial: </span>
+                                <span className="font-semibold">${formatMoney(plataArgentinaInicial)}</span>
+                              </div>
+                              {totalIngresosArs > 0 && (
+                                <>
+                                  <span className="text-muted-foreground/40 hidden xs:inline">•</span>
+                                  <div>
+                                    <span className="font-bold text-foreground">Recibido: </span>
+                                    <span className="font-black text-emerald-600 dark:text-emerald-400">
+                                      +${formatMoney(totalIngresosArs)}
+                                    </span>
+                                  </div>
+                                </>
+                              )}
+                              <span className="text-muted-foreground/40 hidden xs:inline">•</span>
+                              <div>
+                                <span className="font-bold text-foreground">Gastado: </span>
+                                <span className="font-black text-rose-600 dark:text-rose-400">
+                                  -${formatMoney(totalGastadoArs)}
+                                </span>
+                              </div>
+                            </div>
+
+                            {/* Botón para cargar plata extra recibida en ARS */}
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                setCargarPlataMoneda('Plata Argentina')
+                                setIsCargarPlataModalOpen(true)
+                              }}
+                              className="w-full mt-3 py-3 px-4 rounded-[calc(var(--radius)-4px)] bg-emerald-500/15 hover:bg-emerald-500/20 active:bg-emerald-500/30 text-emerald-700 dark:text-emerald-300 border border-emerald-500/35 font-black text-sm sm:text-base flex items-center justify-center gap-2 select-none touch-manipulation active:scale-[0.98] transition-all"
+                            >
+                              <CircleDollarSign className="h-5 w-5 stroke-[2.5]" />
+                              <span>+ Ingreso para el viaje (ARS)</span>
+                            </button>
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
                   </div>
 
-                  {/* Saldo Chile (CLP) */}
-                  <div className="mt-3 p-4 rounded-[var(--radius)] bg-background/80 dark:bg-muted/30 border border-border/80 flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-3">
-                      <FlagChile />
-                      <div>
-                        <span className="text-lg sm:text-xl font-extrabold text-foreground block leading-tight">
-                          CLP (Chilena)
-                        </span>
-                        {guardado && (
-                          <span className="text-xs text-muted-foreground">
-                            Inicial: ${formatMoney(plataChilenaInicial)} • Gastado: $
-                            {formatMoney(clpSummary.expense)}
+                  {/* Saldo Chile (CLP) como Acordeón */}
+                  <div className="mt-3.5 rounded-[var(--radius)] bg-background/90 dark:bg-muted/40 border border-border/80 overflow-hidden transition-all shadow-xs">
+                    <button
+                      type="button"
+                      onClick={() => setExpandedClp(!expandedClp)}
+                      className="w-full p-4 sm:p-5 text-left touch-manipulation select-none active:bg-muted/60 transition-colors"
+                      aria-expanded={expandedClp}
+                    >
+                      {/* Fila 1: Bandera + CLP a la izquierda | Píldora "Detalles v" a la derecha */}
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-3">
+                          <FlagChile />
+                          <span className="text-2xl sm:text-3xl font-black text-foreground leading-tight tracking-tight">
+                            CLP
                           </span>
+                        </div>
+                        {guardado && (
+                          <div
+                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs sm:text-sm font-bold border transition-colors ${
+                              expandedClp
+                                ? 'bg-primary/20 text-primary border-primary/40'
+                                : 'bg-muted/80 text-muted-foreground border-border'
+                            }`}
+                          >
+                            <span>Detalles</span>
+                            <ChevronDown
+                              className={`h-4 w-4 transition-transform duration-200 ${
+                                expandedClp ? 'rotate-180 text-primary' : ''
+                              }`}
+                            />
+                          </div>
                         )}
                       </div>
-                    </div>
-                    <span
-                      className={`text-2xl sm:text-3xl font-black tracking-tight ${
-                        plataChilena < 0
-                          ? 'text-red-500'
-                          : 'text-emerald-600 dark:text-emerald-400'
-                      }`}
-                    >
-                      ${formatMoney(plataChilena)}
-                    </span>
+
+                      {/* Fila 2: Saldo disponible con ancho completo (cero superposición) */}
+                      <div className="mt-2.5 pt-2 border-t border-border/40 flex items-baseline justify-between gap-2">
+                        <span className="text-xs sm:text-sm font-bold text-muted-foreground uppercase tracking-wider">
+                          Disponible
+                        </span>
+                        <div className="text-right overflow-hidden flex justify-end">
+                          <CurrencyText
+                            amount={plataChilena}
+                            currency="CLP"
+                            autoFit={true}
+                            className={`text-3xl sm:text-4xl font-black tracking-tight justify-end text-right ${
+                              !guardado
+                                ? 'text-muted-foreground'
+                                : plataChilena < 0
+                                ? 'text-red-500'
+                                : 'text-emerald-600 dark:text-emerald-400'
+                            }`}
+                          />
+                        </div>
+                      </div>
+                    </button>
+
+                    <AnimatePresence initial={false}>
+                      {expandedClp && guardado && (
+                        <motion.div
+                          key="clp-accordion"
+                          initial={{ height: 0, opacity: 0 }}
+                          animate={{ height: 'auto', opacity: 1 }}
+                          exit={{ height: 0, opacity: 0 }}
+                          transition={{ duration: 0.2, ease: 'easeInOut' }}
+                          className="overflow-hidden"
+                        >
+                          <div className="px-5 pb-4 pt-2 border-t border-border/60 bg-muted/30">
+                            <div className="flex flex-wrap items-center justify-between gap-y-1.5 gap-x-3 text-sm sm:text-base text-muted-foreground pt-1.5">
+                              <div>
+                                <span className="font-bold text-foreground">Inicial: </span>
+                                <span className="font-semibold">${formatMoney(plataChilenaInicial)}</span>
+                              </div>
+                              {totalIngresosClp > 0 && (
+                                <>
+                                  <span className="text-muted-foreground/40 hidden xs:inline">•</span>
+                                  <div>
+                                    <span className="font-bold text-foreground">Recibido: </span>
+                                    <span className="font-black text-emerald-600 dark:text-emerald-400">
+                                      +${formatMoney(totalIngresosClp)}
+                                    </span>
+                                  </div>
+                                </>
+                              )}
+                              <span className="text-muted-foreground/40 hidden xs:inline">•</span>
+                              <div>
+                                <span className="font-bold text-foreground">Gastado: </span>
+                                <span className="font-black text-rose-600 dark:text-rose-400">
+                                  -${formatMoney(totalGastadoClp)}
+                                </span>
+                              </div>
+                            </div>
+
+                            {/* Botón para cargar plata extra recibida en CLP */}
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                setCargarPlataMoneda('Plata Chilena')
+                                setIsCargarPlataModalOpen(true)
+                              }}
+                              className="w-full mt-3 py-3 px-4 rounded-[calc(var(--radius)-4px)] bg-emerald-500/15 hover:bg-emerald-500/20 active:bg-emerald-500/30 text-emerald-700 dark:text-emerald-300 border border-emerald-500/35 font-black text-sm sm:text-base flex items-center justify-center gap-2 select-none touch-manipulation active:scale-[0.98] transition-all"
+                            >
+                              <CircleDollarSign className="h-5 w-5 stroke-[2.5]" />
+                              <span>+ Ingreso para el viaje (CLP)</span>
+                            </button>
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
                   </div>
                 </GlowCard>
 
-                {/* ESTADO 1: FORMULARIO INICIAL OBLIGATORIO (!guardado) */}
+                {/* Si NO hay viaje activo: Tarjeta para iniciar viaje */}
                 {!guardado && (
-                  <Card className="border-border/80 shadow-md">
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-xl font-bold text-center">
-                        Iniciar Nuevo Viaje
-                      </CardTitle>
-                      <p className="text-sm text-muted-foreground text-center">
-                        Ingresa la plata inicial en pesos argentinos y chilenos y el destino del viaje para habilitar la carga de gastos.
+                  <Card className="border-dashed border-2 border-primary/30 bg-primary/5 p-7 sm:p-8 text-center space-y-5 rounded-[var(--radius)]">
+                    <div className="p-4 bg-primary/10 text-primary w-20 h-20 rounded-full mx-auto flex items-center justify-center">
+                      <Truck className="h-10 w-10" strokeWidth={2.4} />
+                    </div>
+                    <div className="space-y-1.5">
+                      <h3 className="text-2xl sm:text-3xl font-black text-foreground">
+                        No hay ningún viaje en curso
+                      </h3>
+                      <p className="text-base sm:text-lg text-muted-foreground max-w-md mx-auto">
+                        Iniciá un viaje ingresando la plata con la que arrancás en pesos argentinos y chilenos y el destino.
                       </p>
-                    </CardHeader>
-                    <CardContent>
-                      <form onSubmit={guardarInicioViaje} className="space-y-4">
-                        <div>
-                          <label className="text-base font-bold text-foreground block mb-1.5">
-                            🇦🇷 Plata Inicial Argentina (ARS)
-                          </label>
-                          <Input
-                            type="number"
-                            inputMode="decimal"
-                            required
-                            placeholder="Ej: 150000"
-                            className="w-full h-14 !text-2xl font-extrabold rounded-[var(--radius)] px-4"
-                            value={inputArs}
-                            onChange={(e) => {
-                              const val = e.target.value
-                              setInputArs(val)
-                              setTripState((prev) => ({
-                                ...prev,
-                                plataArgentina: parseFloat(val) || 0,
-                              }))
-                            }}
-                          />
-                        </div>
+                    </div>
 
-                        <div>
-                          <label className="text-base font-bold text-foreground block mb-1.5">
-                            🇨🇱 Plata Inicial Chilena (CLP)
-                          </label>
-                          <Input
-                            type="number"
-                            inputMode="decimal"
-                            required
-                            placeholder="Ej: 200000"
-                            className="w-full h-14 !text-2xl font-extrabold rounded-[var(--radius)] px-4"
-                            value={inputClp}
-                            onChange={(e) => {
-                              const val = e.target.value
-                              setInputClp(val)
-                              setTripState((prev) => ({
-                                ...prev,
-                                plataChilena: parseFloat(val) || 0,
-                              }))
-                            }}
-                          />
-                        </div>
-
-                        <div>
-                          <label className="text-base font-bold text-foreground block mb-1.5">
-                            📍 Destino del viaje
-                          </label>
-                          <Input
-                            type="text"
-                            required
-                            placeholder="Ej: Santiago de Chile"
-                            className="w-full h-14 !text-2xl font-bold rounded-[var(--radius)] px-4"
-                            value={destino}
-                            onChange={(e) =>
-                              setTripState((prev) => ({ ...prev, destino: e.target.value }))
-                            }
-                          />
-                        </div>
-
-                        <Button
-                          type="submit"
-                          disabled={!isInitialFormValid}
-                          className="w-full py-7 text-2xl font-extrabold bg-primary hover:bg-primary/90 text-primary-foreground rounded-[var(--radius)] flex items-center justify-center gap-3 shadow-lg shadow-primary/25 mt-2 disabled:opacity-40"
-                        >
-                          <Save className="w-7 h-7" />
-                          Guardar
-                        </Button>
-                      </form>
-                    </CardContent>
+                    <Button
+                      type="button"
+                      onClick={() => setIsInitTripModalOpen(true)}
+                      className="w-full py-8 text-2xl sm:text-3xl font-black bg-primary hover:bg-primary/90 text-primary-foreground rounded-[var(--radius)] flex items-center justify-center gap-3.5 shadow-xl shadow-primary/30"
+                    >
+                      <Plus className="w-8 h-8 stroke-[3]" />
+                      Iniciar Nuevo Viaje
+                    </Button>
                   </Card>
                 )}
 
-                {/* ESTADO 2: VIAJE EN CURSO (guardado === true) */}
+                {/* Si HAY viaje activo: Botones de Acción + Resumen de Últimos Gastos + Gráficos del Viaje + Botón Terminar */}
                 {guardado && (
-                  <div className="space-y-4">
-                    {/* Botón Gigante Agregar Gasto */}
+                  <div className="space-y-5">
+                    {/* Botón Principal para Agregar Gasto */}
                     <Button
                       type="button"
                       onClick={() => setIsAddModalOpen(true)}
-                      className="w-full py-8 text-2xl sm:text-3xl font-extrabold bg-primary hover:bg-primary/90 text-primary-foreground rounded-[var(--radius)] flex items-center justify-center gap-3 shadow-lg shadow-primary/30 active:scale-[0.98]"
+                      className="w-full py-9 text-2xl sm:text-3xl md:text-4xl font-black bg-primary hover:bg-primary/90 text-primary-foreground rounded-[var(--radius)] flex items-center justify-center gap-3.5 shadow-xl shadow-primary/35"
                     >
-                      <CirclePlus className="w-9 h-9 shrink-0" />
+                      <CirclePlus className="w-10 h-10 sm:w-11 sm:h-11 shrink-0" strokeWidth={2.5} />
                       Agregar Gasto
                     </Button>
 
-                    {/* Botón Reiniciar Viaje */}
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={resetViaje}
-                      className="w-full py-6 text-xl sm:text-2xl font-bold rounded-[var(--radius)] border-2 flex items-center justify-center gap-2.5"
-                    >
-                      <RotateCw className="w-6 h-6" />
-                      Reiniciar Viaje
-                    </Button>
-
-                    {/* Lista rápida de Gastos Registrados + Exportar PDF */}
-                    <Card className="mt-4">
-                      <CardHeader className="pb-3">
-                        <div className="flex items-center justify-between gap-2 flex-wrap">
-                          <CardTitle className="text-lg sm:text-xl font-extrabold flex items-center gap-2">
-                            <Newspaper className="w-5 h-5 text-primary" />
-                            Gastos registrados ({gastos.length})
-                          </CardTitle>
-
-                          <Button
+                    {/* 2. Resumen de los Últimos Gastos */}
+                    <Card className="rounded-[var(--radius)]">
+                      <CardHeader className="pb-3.5 flex flex-row items-center justify-between">
+                        <CardTitle className="text-lg sm:text-xl font-black flex items-center gap-2.5">
+                          <Clock className="w-6 h-6 text-primary" strokeWidth={2.4} />
+                          Últimos gastos registrados
+                        </CardTitle>
+                        {gastos.length > 4 && (
+                          <button
                             type="button"
-                            variant="outline"
-                            onClick={() => exportTripPDF(tripState)}
-                            className="rounded-[var(--radius)] border-primary/40 bg-primary/10 text-primary font-bold gap-2"
+                            onClick={() => setActiveTab('gastos')}
+                            className="text-sm font-bold text-primary flex items-center gap-1 hover:underline"
                           >
-                            <FileDown className="w-4 h-4" />
-                            Exportar PDF
-                          </Button>
-                        </div>
+                            Ver todos ({gastos.length})
+                            <ArrowRight className="w-4 h-4" />
+                          </button>
+                        )}
                       </CardHeader>
 
                       <CardContent>
-                        {gastos.length === 0 ? (
-                          <p className="text-center text-lg font-semibold text-muted-foreground py-6">
-                            No hay gastos todavía. Tocá "Agregar Gasto" o el botón + de abajo.
+                        {ultimosGastos.length === 0 ? (
+                          <p className="text-center text-base font-semibold text-muted-foreground py-6">
+                            Todavía no registraste gastos en este viaje. Tocá <strong>Agregar Gasto</strong> para empezar.
                           </p>
                         ) : (
-                          <div className="overflow-x-auto rounded-[var(--radius)] border border-border">
-                            <table className="w-full text-left border-collapse text-sm sm:text-base">
-                              <thead>
-                                <tr className="bg-muted/70 border-b border-border text-muted-foreground">
-                                  <th className="p-3 font-bold">Fecha</th>
-                                  <th className="p-3 font-bold">Tipo de Gasto</th>
-                                  <th className="p-3 font-bold">Monto</th>
-                                  <th className="p-3 font-bold">Tipo plata</th>
-                                  <th className="p-3 font-bold text-right">Acción</th>
-                                </tr>
-                              </thead>
-                              <tbody className="divide-y divide-border">
-                                {gastos.map((g, i) => (
-                                  <tr key={g.id || i} className="hover:bg-muted/30">
-                                    <td className="p-3 whitespace-nowrap">{g.fecha}</td>
-                                    <td className="p-3 font-bold">
-                                      <div>{g.tipoGasto}</div>
-                                      {g.descripcion && (
-                                        <div className="text-xs text-muted-foreground font-normal">
-                                          {g.descripcion}
-                                        </div>
-                                      )}
-                                      {g.dias && (
-                                        <div className="text-xs text-primary font-semibold">
-                                          {g.dias} día{g.dias > 1 ? 's' : ''}
-                                        </div>
-                                      )}
-                                    </td>
-                                    <td className="p-3 font-extrabold whitespace-nowrap text-rose-600 dark:text-rose-400">
-                                      ${formatMoney(g.monto)}
-                                    </td>
-                                    <td className="p-3 whitespace-nowrap font-medium">
-                                      {g.tipoPlata === 'Plata Argentina'
-                                        ? '🇦🇷 Argentina'
-                                        : '🇨🇱 Chilena'}
-                                    </td>
-                                    <td className="p-3 text-right">
-                                      <Button
-                                        type="button"
-                                        variant="destructive"
-                                        size="sm"
-                                        onClick={() => eliminarGasto(i)}
-                                        className="rounded-[calc(var(--radius)-4px)] font-bold"
-                                      >
-                                        <Trash2 className="w-4 h-4 sm:mr-1" />
-                                        <span className="hidden sm:inline">Eliminar</span>
-                                      </Button>
-                                    </td>
-                                  </tr>
-                                ))}
-                              </tbody>
-                            </table>
+                          <div className="divide-y divide-border/60">
+                            {ultimosGastos.map((g) => (
+                              <div
+                                key={g.id}
+                                className="py-3.5 flex items-center justify-between gap-3"
+                              >
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <span className={`font-black text-base sm:text-lg break-words ${
+                                      g.esIngreso ? 'text-emerald-600 dark:text-emerald-400' : 'text-foreground'
+                                    }`}>
+                                      {g.esIngreso ? `[+] ${g.tipoGasto}` : g.tipoGasto}
+                                    </span>
+                                    <span className="text-xs sm:text-sm px-2.5 py-0.5 rounded-full bg-muted font-bold text-muted-foreground shrink-0">
+                                      {g.tipoPlata === 'Plata Argentina' ? '🇦🇷 ARS' : '🇨🇱 CLP'}
+                                    </span>
+                                    {g.esIngreso && (
+                                      <span className="text-xs sm:text-sm px-2.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 font-bold shrink-0">
+                                        Ingreso
+                                      </span>
+                                    )}
+                                    {g.dias && (
+                                      <span className="text-xs sm:text-sm px-2.5 py-0.5 rounded-full bg-primary/15 text-primary font-bold shrink-0">
+                                        {g.dias} día{g.dias > 1 ? 's' : ''}
+                                      </span>
+                                    )}
+                                  </div>
+                                  {g.descripcion && (
+                                    <p className="text-sm text-muted-foreground mt-0.5 break-words">
+                                      {g.descripcion}
+                                    </p>
+                                  )}
+                                  <span className="text-xs sm:text-sm text-muted-foreground block mt-0.5 font-bold">
+                                    {g.fecha}
+                                  </span>
+                                </div>
+
+                                <div className="shrink-0 text-right">
+                                  <CurrencyText
+                                    amount={g.monto}
+                                    currency={g.tipoPlata === 'Plata Argentina' ? 'ARS' : 'CLP'}
+                                    sign={g.esIngreso ? 'plus' : 'minus'}
+                                    className={`font-black text-lg sm:text-2xl ${
+                                      g.esIngreso
+                                        ? 'text-emerald-600 dark:text-emerald-400'
+                                        : 'text-rose-600 dark:text-rose-400'
+                                    }`}
+                                  />
+                                </div>
+                              </div>
+                            ))}
                           </div>
                         )}
                       </CardContent>
                     </Card>
+
+                    {/* 3. Gráficos Propios del Viaje Actual (Categorías y Gastado vs Disponible) */}
+                    <TripCharts
+                      gastos={gastos}
+                      plataArgentinaInicial={plataArgentinaInicial}
+                      plataChilenaInicial={plataChilenaInicial}
+                      plataArgentina={plataArgentina}
+                      plataChilena={plataChilena}
+                      themeColor={tripState.themeColor}
+                    />
+
+                    {/* 4. Acciones: Exportar PDF y Terminar Viaje */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => exportTripPDF(tripState)}
+                        className="w-full py-6 text-lg sm:text-xl font-black rounded-[var(--radius)] border-2 border-primary/40 bg-primary/10 text-primary flex items-center justify-center gap-2.5"
+                      >
+                        <FileDown className="w-6 h-6" />
+                        Exportar PDF
+                      </Button>
+
+                      {/* Botón Terminar Viaje (Pasa al Historial) */}
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={terminarViaje}
+                        className="w-full py-6 text-lg sm:text-xl font-black rounded-[var(--radius)] border-2 border-rose-500/40 hover:bg-rose-500/10 text-rose-600 dark:text-rose-400 flex items-center justify-center gap-2.5"
+                      >
+                        <Flag className="w-6 h-6" />
+                        Terminar Viaje
+                      </Button>
+                    </div>
                   </div>
                 )}
               </div>
             )}
 
-            {/* PESTAÑA 2: GASTOS (Con filtro por moneda, buscador y exportar PDF) */}
+            {/* PESTAÑA 2: GASTOS (Lista Completa, Filtros, Buscador y Eliminar) */}
             {activeTab === 'gastos' && (
               <div className="space-y-4 max-w-2xl mx-auto">
                 <div className="bg-card p-3.5 rounded-[var(--radius)] border border-border shadow-xs space-y-3">
                   {/* Selector de Moneda */}
-                  <div className="grid grid-cols-3 bg-muted/90 p-1 rounded-[calc(var(--radius)-2px)] text-xs sm:text-sm gap-1 border border-border/60">
+                  <div className="grid grid-cols-3 bg-muted/90 p-1.5 rounded-[calc(var(--radius)-2px)] text-sm sm:text-base gap-1.5 border border-border/60">
                     <button
                       type="button"
                       onClick={() => setMonedaFilter('all')}
-                      className={`py-2.5 px-2 rounded-[calc(var(--radius)-6px)] transition-all text-center font-bold active:scale-95 touch-manipulation select-none ${
+                      className={`py-3 px-2 rounded-[calc(var(--radius)-6px)] transition-all text-center font-black select-none touch-manipulation ${
                         monedaFilter === 'all'
                           ? 'bg-primary text-primary-foreground shadow-sm'
                           : 'text-muted-foreground'
@@ -709,7 +924,7 @@ export function App() {
                     <button
                       type="button"
                       onClick={() => setMonedaFilter('Plata Argentina')}
-                      className={`py-2.5 px-2 rounded-[calc(var(--radius)-6px)] transition-all text-center font-bold active:scale-95 touch-manipulation select-none ${
+                      className={`py-3 px-2 rounded-[calc(var(--radius)-6px)] transition-all text-center font-black select-none touch-manipulation ${
                         monedaFilter === 'Plata Argentina'
                           ? 'bg-primary text-primary-foreground shadow-sm'
                           : 'text-muted-foreground'
@@ -720,7 +935,7 @@ export function App() {
                     <button
                       type="button"
                       onClick={() => setMonedaFilter('Plata Chilena')}
-                      className={`py-2.5 px-2 rounded-[calc(var(--radius)-6px)] transition-all text-center font-bold active:scale-95 touch-manipulation select-none ${
+                      className={`py-3 px-2 rounded-[calc(var(--radius)-6px)] transition-all text-center font-black select-none touch-manipulation ${
                         monedaFilter === 'Plata Chilena'
                           ? 'bg-primary text-primary-foreground shadow-sm'
                           : 'text-muted-foreground'
@@ -731,89 +946,110 @@ export function App() {
                   </div>
 
                   {/* Buscador + Botón PDF */}
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2.5">
                     <div className="relative flex-1">
-                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
                       <Input
                         placeholder="Buscar gasto por categoría, nota o fecha..."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
-                        className="pl-9 h-11 rounded-[var(--radius)]"
+                        className="pl-11 h-14 text-base sm:text-lg font-bold rounded-[var(--radius)]"
                       />
                     </div>
                     <Button
                       type="button"
-                      disabled={!guardado}
+                      disabled={!guardado || gastos.length === 0}
                       onClick={() => exportTripPDF(tripState)}
-                      className="h-11 px-4 rounded-[var(--radius)] font-bold gap-1.5 shrink-0 disabled:opacity-40"
+                      className="h-14 px-5 text-base font-black rounded-[var(--radius)] gap-2 shrink-0 disabled:opacity-40"
                     >
-                      <FileDown className="h-4 w-4" />
-                      Exportar PDF
+                      <FileDown className="h-5 w-5" />
+                      PDF
                     </Button>
                   </div>
                 </div>
 
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-base font-bold">
+                <Card className="rounded-[var(--radius)]">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-lg sm:text-xl font-black">
                       Detalle de Gastos ({filteredGastos.length})
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="divide-y divide-border">
                     {!guardado ? (
-                      <div className="py-10 text-center text-muted-foreground space-y-2">
-                        <Lock className="h-8 w-8 mx-auto text-muted-foreground/50" />
-                        <p className="font-semibold">
-                          Primero completa la plata inicial y el destino en la pestaña "Viaje".
-                        </p>
+                      <div className="py-12 text-center text-muted-foreground space-y-3.5">
+                        <Truck className="h-10 w-10 mx-auto text-primary/60" />
+                        <p className="font-bold text-lg">No hay ningún viaje activo en este momento.</p>
+                        <Button
+                          type="button"
+                          onClick={() => setIsInitTripModalOpen(true)}
+                          className="h-14 px-6 text-xl font-black rounded-[var(--radius)]"
+                        >
+                          Iniciar Viaje
+                        </Button>
                       </div>
                     ) : filteredGastos.length === 0 ? (
-                      <div className="py-10 text-center text-muted-foreground">
+                      <div className="py-12 text-center text-muted-foreground font-bold text-base">
                         No hay gastos registrados con este filtro.
                       </div>
                     ) : (
                       filteredGastos.map((g) => (
                         <div
-                          key={g.id || g.originalIndex}
-                          className="py-3.5 flex items-center justify-between gap-3"
+                          key={g.id}
+                          className="py-4 flex items-center justify-between gap-3"
                         >
                           <div className="min-w-0 flex-1">
                             <div className="flex items-center gap-2 flex-wrap">
-                              <span className="font-bold text-base text-foreground">
-                                {g.tipoGasto}
+                              <span className={`font-black text-lg sm:text-xl break-words ${
+                                g.esIngreso ? 'text-emerald-600 dark:text-emerald-400' : 'text-foreground'
+                              }`}>
+                                {g.esIngreso ? `[+] ${g.tipoGasto}` : g.tipoGasto}
                               </span>
-                              <span className="text-xs px-2 py-0.5 rounded-full bg-muted font-semibold">
+                              <span className="text-xs sm:text-sm px-2.5 py-0.5 rounded-full bg-muted font-bold text-muted-foreground shrink-0">
                                 {g.tipoPlata === 'Plata Argentina' ? '🇦🇷 ARS' : '🇨🇱 CLP'}
                               </span>
+                              {g.esIngreso && (
+                                <span className="text-xs sm:text-sm px-2.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 font-bold shrink-0">
+                                  Ingreso
+                                </span>
+                              )}
                               {g.dias && (
-                                <span className="text-xs px-2 py-0.5 rounded-full bg-primary/15 text-primary font-bold">
+                                <span className="text-xs sm:text-sm px-2.5 py-0.5 rounded-full bg-primary/15 text-primary font-bold shrink-0">
                                   {g.dias} día{g.dias > 1 ? 's' : ''}
                                 </span>
                               )}
                             </div>
                             {g.descripcion && (
-                              <p className="text-xs text-muted-foreground mt-0.5">
+                              <p className="text-sm text-muted-foreground mt-0.5 break-words">
                                 {g.descripcion}
                               </p>
                             )}
-                            <p className="text-xs text-muted-foreground mt-0.5">
-                              {g.fecha} • Quedaban: ${formatMoney(g.totalRestante)}
+                            <p className="text-xs sm:text-sm text-muted-foreground mt-0.5 font-bold">
+                              {g.fecha}
                             </p>
                           </div>
 
-                          <div className="flex items-center gap-2.5 shrink-0">
-                            <span className="font-extrabold text-base sm:text-lg text-rose-600 dark:text-rose-400">
-                              -${formatMoney(g.monto)}
-                            </span>
+                          <div className="flex items-center gap-3 shrink-0">
+                            <div className="text-right">
+                              <CurrencyText
+                                amount={g.monto}
+                                currency={g.tipoPlata === 'Plata Argentina' ? 'ARS' : 'CLP'}
+                                sign={g.esIngreso ? 'plus' : 'minus'}
+                                className={`font-black text-lg sm:text-2xl ${
+                                  g.esIngreso
+                                    ? 'text-emerald-600 dark:text-emerald-400'
+                                    : 'text-rose-600 dark:text-rose-400'
+                                }`}
+                              />
+                            </div>
                             <Button
                               type="button"
                               variant="destructive"
                               size="sm"
-                              onClick={() => eliminarGasto(g.originalIndex)}
-                              className="h-9 w-9 p-0 rounded-[calc(var(--radius)-4px)]"
-                              title="Eliminar gasto"
+                              onClick={() => eliminarGasto(g.id)}
+                              className="h-11 w-11 p-0 rounded-[calc(var(--radius)-4px)]"
+                              title={g.esIngreso ? 'Eliminar ingreso' : 'Eliminar gasto'}
                             >
-                              <Trash2 className="h-4 w-4" />
+                              <Trash2 className="h-5 w-5" />
                             </Button>
                           </div>
                         </div>
@@ -824,124 +1060,114 @@ export function App() {
               </div>
             )}
 
-            {/* PESTAÑA 3: GRÁFICOS Y ESTADÍSTICAS DE GASTOS DEL VIAJE */}
-            {activeTab === 'charts' && (
-              <FinanceDashboard
-                transactions={dashboardTransactions}
-                allPeriodTransactions={dashboardTransactions}
-                allTransactions={dashboardTransactions}
-                currency="ARS"
-                themeColor={tripState.themeColor}
-                account1Name="Plata Argentina (ARS)"
-                account2Name="Plata Chilena (CLP)"
-                account1Emoji="🇦🇷"
-                account2Emoji="🇨🇱"
-                account1Summary={arsSummary}
-                account2Summary={clpSummary}
+            {/* PESTAÑA 3: HISTORIAL DE VIAJES ANTERIORES (Reemplaza la pestaña de Gráficos) */}
+            {activeTab === 'history' && (
+              <TripHistoryTab
+                history={history}
+                onDeleteTrip={handleDeleteTripFromHistory}
               />
             )}
 
-            {/* PESTAÑA 4: AJUSTES (Nombre del Chofer, Colores, Bordes, Categorías Personalizables) */}
+            {/* PESTAÑA 4: AJUSTES (Chofer, Colores, Bordes, Categorías Personalizables) */}
             {activeTab === 'settings' && (
               <TripSettingsTab
                 tripState={tripState}
                 onUpdateState={handleUpdatePartial}
-                onExportPdf={() => exportTripPDF(tripState)}
-                onResetTrip={resetViaje}
+                onResetTrip={terminarViaje}
               />
             )}
           </motion.div>
         </AnimatePresence>
       </main>
 
-      {/* Barra de Navegación Inferior Unificada con Botón Central [+] (Bloqueado hasta guardar viaje inicial) */}
+      {/* Barra de Navegación Inferior Unificada: Viaje, Gastos, [+], Historial, Ajustes */}
       <nav className="fixed bottom-0 inset-x-0 bg-background/95 backdrop-blur-xl border-t sm:border border-border z-40 sm:bottom-4 sm:max-w-lg sm:mx-auto sm:rounded-3xl sm:shadow-2xl pb-safe">
-        <div className="flex items-center justify-around h-16 px-1 relative">
+        <div className="flex items-center justify-around h-20 sm:h-22 px-1 relative">
           {/* Tab 1: Viaje */}
           <button
             type="button"
             onClick={() => setActiveTab('trip')}
-            className={`flex-1 flex flex-col items-center justify-center gap-1 py-1.5 mx-0.5 rounded-2xl transition-all active:scale-90 select-none touch-manipulation ${
+            className={`flex-1 flex flex-col items-center justify-center gap-1.5 py-2 mx-0.5 rounded-2xl transition-all select-none touch-manipulation ${
               activeTab === 'trip'
-                ? 'text-primary font-bold bg-primary/12'
+                ? 'text-primary font-black bg-primary/15'
                 : 'text-muted-foreground active:bg-primary/10 active:text-primary'
             }`}
           >
-            <Truck className="h-5 w-5" />
-            <span className="text-[10px]">Viaje</span>
+            <Truck className="h-6 w-6 sm:h-7 sm:w-7 stroke-[2.4]" />
+            <span className="text-xs sm:text-sm font-black">Viaje</span>
           </button>
 
           {/* Tab 2: Gastos */}
           <button
             type="button"
             onClick={() => setActiveTab('gastos')}
-            className={`flex-1 flex flex-col items-center justify-center gap-1 py-1.5 mx-0.5 rounded-2xl transition-all active:scale-90 select-none touch-manipulation ${
+            className={`flex-1 flex flex-col items-center justify-center gap-1.5 py-2 mx-0.5 rounded-2xl transition-all select-none touch-manipulation ${
               activeTab === 'gastos'
-                ? 'text-primary font-bold bg-primary/12'
+                ? 'text-primary font-black bg-primary/15'
                 : 'text-muted-foreground active:bg-primary/10 active:text-primary'
             }`}
           >
-            <Receipt className="h-5 w-5" />
-            <span className="text-[10px]">Gastos</span>
+            <Receipt className="h-6 w-6 sm:h-7 sm:w-7 stroke-[2.4]" />
+            <span className="text-xs sm:text-sm font-black">Gastos</span>
           </button>
 
-          {/* Botón Central [+] Elevado (Deshabilitado si !guardado) */}
+          {/* Botón Central [+] Elevado */}
           <div className="flex-1 flex items-center justify-center">
             <button
               type="button"
-              disabled={!guardado}
               onClick={() => {
-                if (guardado) setIsAddModalOpen(true)
+                if (!guardado) {
+                  setIsInitTripModalOpen(true)
+                } else {
+                  setIsAddModalOpen(true)
+                }
               }}
-              className={`relative h-16 w-16 -mt-7 shrink-0 rounded-[var(--radius)] flex items-center justify-center ring-4 ring-background transition-all duration-150 ease-out select-none touch-manipulation ${
-                guardado
-                  ? 'bg-gradient-to-tr from-primary via-primary/95 to-primary/80 text-primary-foreground shadow-xl shadow-primary/40 active:scale-90 active:rotate-90 active:ring-primary/40 cursor-pointer'
-                  : 'bg-muted text-muted-foreground/50 border border-border opacity-50 cursor-not-allowed'
-              }`}
-              title={
-                guardado
-                  ? 'Agregar Gasto del Viaje'
-                  : 'Primero completa y guarda la plata inicial y el destino'
-              }
+              className="relative w-16 h-16 sm:w-20 sm:h-20 -mt-7 sm:-mt-10 shrink-0 rounded-full bg-gradient-to-tr from-primary via-primary/95 to-primary/80 text-primary-foreground shadow-2xl shadow-primary/40 flex items-center justify-center ring-4 ring-background transition-all active:scale-95 duration-150 ease-out select-none touch-manipulation cursor-pointer"
+              title={guardado ? 'Agregar Gasto del Viaje' : 'Iniciar Nuevo Viaje'}
             >
-              <Plus className="h-8 w-8 stroke-[2.8]" />
-              {!guardado && (
-                <Lock className="h-3.5 w-3.5 absolute bottom-1.5 right-1.5 text-muted-foreground" />
-              )}
+              <Plus className="h-8 w-8 sm:h-10 sm:w-10 stroke-[3]" />
             </button>
           </div>
 
-          {/* Tab 3: Gráficos */}
+          {/* Tab 3: Historial (Reemplaza a Gráficos) */}
           <button
             type="button"
-            onClick={() => setActiveTab('charts')}
-            className={`flex-1 flex flex-col items-center justify-center gap-1 py-1.5 mx-0.5 rounded-2xl transition-all active:scale-90 select-none touch-manipulation ${
-              activeTab === 'charts'
-                ? 'text-primary font-bold bg-primary/12'
+            onClick={() => setActiveTab('history')}
+            className={`flex-1 flex flex-col items-center justify-center gap-1.5 py-2 mx-0.5 rounded-2xl transition-all select-none touch-manipulation ${
+              activeTab === 'history'
+                ? 'text-primary font-black bg-primary/15'
                 : 'text-muted-foreground active:bg-primary/10 active:text-primary'
             }`}
           >
-            <BarChart3 className="h-5 w-5" />
-            <span className="text-[10px]">Gráficos</span>
+            <History className="h-6 w-6 sm:h-7 sm:w-7 stroke-[2.4]" />
+            <span className="text-xs sm:text-sm font-black">Historial</span>
           </button>
 
           {/* Tab 4: Ajustes */}
           <button
             type="button"
             onClick={() => setActiveTab('settings')}
-            className={`flex-1 flex flex-col items-center justify-center gap-1 py-1.5 mx-0.5 rounded-2xl transition-all active:scale-90 select-none touch-manipulation ${
+            className={`flex-1 flex flex-col items-center justify-center gap-1.5 py-2 mx-0.5 rounded-2xl transition-all select-none touch-manipulation ${
               activeTab === 'settings'
-                ? 'text-primary font-bold bg-primary/12'
+                ? 'text-primary font-black bg-primary/15'
                 : 'text-muted-foreground active:bg-primary/10 active:text-primary'
             }`}
           >
-            <Settings className="h-5 w-5" />
-            <span className="text-[10px]">Ajustes</span>
+            <Settings className="h-6 w-6 sm:h-7 sm:w-7 stroke-[2.4]" />
+            <span className="text-xs sm:text-sm font-black">Ajustes</span>
           </button>
         </div>
       </nav>
 
-      {/* Modal para Agregar Gasto */}
+      {/* Modal 1: Iniciar Nuevo Viaje (se abre la primera vez que toca [+]) */}
+      <InitTripModal
+        open={isInitTripModalOpen}
+        onOpenChange={setIsInitTripModalOpen}
+        onInitTrip={handleInitTrip}
+        initialDestino={destino}
+      />
+
+      {/* Modal 2: Agregar Gasto (se abre cuando ya hay un viaje activo) */}
       <AddGastoModal
         open={isAddModalOpen}
         onOpenChange={setIsAddModalOpen}
@@ -949,6 +1175,14 @@ export function App() {
         onAddCategory={handleAddCategory}
         defaultMoneda={monedaFilter === 'Plata Chilena' ? 'Plata Chilena' : 'Plata Argentina'}
         onAddGasto={handleAddGasto}
+      />
+
+      {/* Modal 3: Cargar Plata Recibida (se abre desde el botón en el acordeón de ARS o CLP) */}
+      <CargarPlataModal
+        open={isCargarPlataModalOpen}
+        onOpenChange={setIsCargarPlataModalOpen}
+        moneda={cargarPlataMoneda}
+        onCargarPlata={handleCargarPlata}
       />
     </div>
   )

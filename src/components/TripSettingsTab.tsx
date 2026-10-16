@@ -13,7 +13,6 @@ import {
   RotateCcw,
   Check,
   User,
-  FileText,
   ShieldAlert,
   Moon,
   Sun,
@@ -22,7 +21,6 @@ import {
 interface TripSettingsTabProps {
   tripState: TripState
   onUpdateState: (partial: Partial<TripState>) => void
-  onExportPdf: () => void
   onResetTrip: () => void
 }
 
@@ -47,7 +45,6 @@ const RADIUS_OPTIONS: { id: BorderRadius; name: string; previewPx: string }[] = 
 export function TripSettingsTab({
   tripState,
   onUpdateState,
-  onExportPdf,
   onResetTrip,
 }: TripSettingsTabProps) {
   const [newCatInput, setNewCatInput] = useState('')
@@ -82,26 +79,26 @@ export function TripSettingsTab({
   return (
     <div className="space-y-6 max-w-4xl mx-auto">
       {/* 1. Perfil del Chofer */}
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base font-bold flex items-center gap-2">
-            <User className="h-5 w-5 text-primary" />
+      <Card className="rounded-[var(--radius)]">
+        <CardHeader className="pb-3.5">
+          <CardTitle className="text-lg sm:text-xl font-black flex items-center gap-2.5">
+            <User className="h-6 w-6 text-primary" />
             Datos del Chofer
           </CardTitle>
-          <CardDescription>
+          <CardDescription className="text-sm sm:text-base font-medium">
             El nombre del chofer queda guardado aquí para incluirse automáticamente en todos los resúmenes PDF.
           </CardDescription>
         </CardHeader>
         <CardContent>
           <div>
-            <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block mb-1.5">
+            <label className="text-sm font-bold text-muted-foreground uppercase tracking-wider block mb-2">
               Nombre del Chofer
             </label>
             <Input
               value={tripState.nombre}
               onChange={(e) => onUpdateState({ nombre: e.target.value })}
               placeholder="Ej: Papá / Nombre y Apellido"
-              className="h-12 text-lg font-semibold"
+              className="h-14 text-xl font-bold rounded-[var(--radius)] px-4"
             />
           </div>
         </CardContent>
@@ -225,29 +222,29 @@ export function TripSettingsTab({
       </Card>
 
       {/* 3. Gestión de Categorías del Camión */}
-      <Card>
-        <CardHeader className="pb-3">
+      <Card className="rounded-[var(--radius)]">
+        <CardHeader className="pb-3.5">
           <div className="flex items-center justify-between gap-2 flex-wrap">
-            <CardTitle className="text-base font-bold flex items-center gap-2">
-              <Tag className="h-5 w-5 text-primary" />
+            <CardTitle className="text-lg sm:text-xl font-black flex items-center gap-2.5">
+              <Tag className="h-6 w-6 text-primary" />
               Categorías de Gastos del Viaje
             </CardTitle>
             <button
               type="button"
               onClick={handleResetCategories}
-              className="text-xs text-primary bg-primary/10 border border-primary/25 font-semibold flex items-center gap-1 transition-all px-2.5 py-1 rounded-full active:scale-95 active:bg-primary active:text-primary-foreground touch-manipulation select-none"
+              className="text-xs sm:text-sm text-primary bg-primary/10 border border-primary/25 font-bold flex items-center gap-1.5 transition-all px-3 py-1.5 rounded-full select-none"
               title="Restablecer a las 10 categorías originales del camión"
             >
-              <RotateCcw className="h-3 w-3" />
+              <RotateCcw className="h-3.5 w-3.5" />
               Restablecer originales
             </button>
           </div>
-          <CardDescription>
+          <CardDescription className="text-sm sm:text-base font-medium">
             Personaliza los tipos de gasto disponibles al cargar un gasto del viaje.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="flex gap-2">
+          <div className="flex gap-2.5">
             <Input
               placeholder="Nueva categoría (ej: Gomero, Lavado, Báscula...)"
               value={newCatInput}
@@ -258,36 +255,36 @@ export function TripSettingsTab({
                   handleAddCategory()
                 }
               }}
-              className="h-11"
+              className="h-14 text-lg font-bold rounded-[var(--radius)]"
             />
             <Button
               type="button"
               onClick={handleAddCategory}
-              className="shrink-0 h-11 px-4 gap-1.5"
+              className="shrink-0 h-14 px-6 text-base font-black gap-2 rounded-[var(--radius)]"
             >
-              <Plus className="h-4 w-4" />
+              <Plus className="h-5 w-5" />
               Agregar
             </Button>
           </div>
 
           <div>
-            <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block mb-2.5">
+            <label className="text-sm font-bold text-muted-foreground uppercase tracking-wider block mb-2.5">
               Categorías activas ({categories.length})
             </label>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-2.5">
               {categories.map((cat) => (
                 <div
                   key={cat}
-                  className="flex items-center gap-2 px-3 py-1.5 rounded-[var(--radius)] border border-border bg-card shadow-xs text-sm font-semibold text-foreground"
+                  className="flex items-center gap-2.5 px-3.5 py-2 rounded-[var(--radius)] border border-border bg-card shadow-xs text-base font-bold text-foreground"
                 >
                   <span>{cat}</span>
                   <button
                     type="button"
                     onClick={() => handleRemoveCategory(cat)}
-                    className="text-rose-500 bg-rose-500/10 border border-rose-500/20 transition-all p-1 rounded-lg active:scale-90 active:bg-rose-600 active:text-white touch-manipulation"
+                    className="text-rose-500 bg-rose-500/10 border border-rose-500/20 transition-all p-1.5 rounded-lg active:bg-rose-600 active:text-white"
                     title={`Eliminar categoría ${cat}`}
                   >
-                    <Trash2 className="h-3.5 w-3.5" />
+                    <Trash2 className="h-4 w-4" />
                   </button>
                 </div>
               ))}
@@ -296,46 +293,30 @@ export function TripSettingsTab({
         </CardContent>
       </Card>
 
-      {/* 4. Exportar PDF y Reiniciar Viaje */}
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base font-bold flex items-center gap-2">
-            <FileText className="h-5 w-5 text-primary" />
-            Resumen PDF y Reinicio de Viaje
+      {/* 4. Reinicio de Viaje */}
+      <Card className="rounded-[var(--radius)]">
+        <CardHeader className="pb-3.5">
+          <CardTitle className="text-lg sm:text-xl font-black flex items-center gap-2.5 text-rose-600 dark:text-rose-400">
+            <ShieldAlert className="h-6 w-6" />
+            Empezar Viaje Nuevo
           </CardTitle>
-          <CardDescription>
-            Descarga o comparte por WhatsApp el resumen PDF del viaje, o reinicia todo para un nuevo viaje.
+          <CardDescription className="text-sm sm:text-base font-medium">
+            Reinicia la plata y los gastos del viaje actual para comenzar uno nuevo desde cero.
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <Button
-            type="button"
-            variant="outline"
-            disabled={!tripState.guardado}
-            onClick={onExportPdf}
-            className="w-full flex items-center justify-center gap-2 h-12 text-base border-primary/40 active:border-primary active:bg-primary/15 text-foreground font-bold shadow-sm rounded-[var(--radius)] disabled:opacity-40"
-          >
-            <FileText className="h-5 w-5 text-primary" />
-            Exportar Resumen PDF del Viaje
-          </Button>
-
-          <div className="pt-4 border-t border-border/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div>
-              <span className="text-sm font-semibold text-rose-600 dark:text-rose-400 flex items-center gap-1.5">
-                <ShieldAlert className="h-4 w-4" /> Empezar Viaje Nuevo
-              </span>
-              <p className="text-xs text-muted-foreground">
-                Borra la plata y los gastos del viaje actual conservando tu nombre, colores y categorías.
-              </p>
-            </div>
+        <CardContent>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <p className="text-xs sm:text-sm text-muted-foreground">
+              Borra el dinero y los gastos de la pantalla actual conservando tu nombre de chofer, colores y categorías.
+            </p>
             <Button
               type="button"
               variant="destructive"
               onClick={onResetTrip}
-              className="shrink-0 font-bold rounded-[var(--radius)]"
+              className="shrink-0 h-12 px-5 text-base font-black rounded-[var(--radius)] flex items-center justify-center gap-2 shadow-xs"
             >
-              <RotateCcw className="h-4 w-4 mr-1.5" />
-              Reiniciar Viaje
+              <RotateCcw className="h-5 w-5" />
+              <span>Reiniciar Viaje</span>
             </Button>
           </div>
         </CardContent>
